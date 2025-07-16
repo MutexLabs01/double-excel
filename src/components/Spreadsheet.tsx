@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { SpreadsheetData, CellData } from '../types/project';
 import { evaluateFormula } from '../utils/formulas';
 import { getColumnName } from '../utils/helpers';
@@ -104,6 +104,22 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     }
   }, [editingCell, editValue, updateCell]);
 
+  // Calculate column widths based on content
+  const MIN_COL_WIDTH = 80;
+  const MAX_COL_WIDTH = 400;
+  const colWidths = useMemo(() => {
+    const widths: number[] = Array(cols).fill(MIN_COL_WIDTH);
+    for (let col = 0; col < cols; col++) {
+      for (let row = 0; row < rows; row++) {
+        const value = getCellValue(row, col);
+        // Estimate width: 8px per char + padding
+        const estWidth = Math.min(MAX_COL_WIDTH, Math.max(MIN_COL_WIDTH, value.length * 8 + 24));
+        if (estWidth > widths[col]) widths[col] = estWidth;
+      }
+    }
+    return widths;
+  }, [data, cols, rows, getCellValue]);
+
   const renderCell = useCallback((row: number, col: number) => {
     const cellKey = `${row}-${col}`;
     const cellData = getCellData(row, col);
@@ -116,11 +132,12 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
       <div
         key={cellKey}
         className={`
-          border border-gray-200 h-8 min-w-20 flex items-center px-2 text-sm cursor-pointer
-          ${isSelected ? 'bg-red-100 border-red-500' : 'bg-white hover:bg-gray-50'}
-          ${isFormula ? 'font-medium text-red-700' : 'text-gray-900'}
+          border border-gray-200 h-8 flex items-center px-2 text-sm cursor-pointer
+          bg-white hover:bg-gray-50
+          ${isFormula ? 'font-medium text-green-700' : 'text-gray-900'}
           ${readonly ? 'cursor-not-allowed' : ''}
         `}
+        style={{ minWidth: colWidths[col], maxWidth: colWidths[col], width: colWidths[col] }}
         onClick={() => handleCellClick(row, col)}
         onDoubleClick={() => handleCellDoubleClick(row, col)}
       >
@@ -139,7 +156,7 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
         )}
       </div>
     );
-  }, [selectedCell, editingCell, editValue, getCellData, getCellValue, handleCellClick, handleCellDoubleClick, handleCellEdit, handleCellSubmit, handleCellBlur, readonly]);
+  }, [selectedCell, editingCell, editValue, getCellData, getCellValue, handleCellClick, handleCellDoubleClick, handleCellEdit, handleCellSubmit, handleCellBlur, readonly, colWidths]);
 
   const formulaBarValue = useMemo(() => {
     if (!selectedCell) return '';
@@ -191,6 +208,7 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
               <div
                 key={col}
                 className="min-w-20 h-8 border border-gray-300 bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600"
+                style={{ minWidth: colWidths[col], maxWidth: colWidths[col], width: colWidths[col] }}
               >
                 {getColumnName(col)}
               </div>

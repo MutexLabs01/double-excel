@@ -68,9 +68,9 @@ const DiffViewer: React.FC<DiffViewerProps> = ({
       case 'added':
         return <Plus className="h-4 w-4 text-green-600" />;
       case 'removed':
-        return <Minus className="h-4 w-4 text-red-600" />;
+        return <Minus className="h-4 w-4 text-black" />;
       case 'modified':
-        return <Edit className="h-4 w-4 text-blue-600" />;
+        return <Edit className="h-4 w-4 text-green-800" />;
     }
   };
 
@@ -79,9 +79,9 @@ const DiffViewer: React.FC<DiffViewerProps> = ({
       case 'added':
         return 'bg-green-50 border-green-200';
       case 'removed':
-        return 'bg-red-50 border-red-200';
+        return 'bg-black border-black';
       case 'modified':
-        return 'bg-red-50 border-red-200';
+        return 'bg-green-50 border-green-200';
     }
   };
 
@@ -109,8 +109,8 @@ const DiffViewer: React.FC<DiffViewerProps> = ({
 
                 <div className="space-y-2 text-sm">
                   {diff.type === 'removed' && (
-                    <div className="bg-red-100 p-2 rounded">
-                      <div className="text-red-800 font-medium">File was removed</div>
+                    <div className="bg-black p-2 rounded">
+                      <div className="text-white font-medium">File was removed</div>
                     </div>
                   )}
 
@@ -121,8 +121,8 @@ const DiffViewer: React.FC<DiffViewerProps> = ({
                   )}
 
                   {diff.type === 'modified' && (
-                    <div className="bg-red-100 p-2 rounded">
-                      <div className="text-red-800 font-medium">File was modified</div>
+                    <div className="bg-green-100 p-2 rounded">
+                      <div className="text-green-800 font-medium">File was modified</div>
                     </div>
                   )}
                 </div>

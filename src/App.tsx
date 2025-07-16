@@ -20,6 +20,11 @@ function App() {
   const [showDiff, setShowDiff] = useState(false);
   const [compareVersion, setCompareVersion] = useState<string>('');
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  // Add state for dashboard/project view
+  const [showProjectDashboard, setShowProjectDashboard] = useState(false);
+  // Add project management state
+  const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -46,6 +51,48 @@ function App() {
       createInitialVersion();
     }
   }, []);
+
+  // Load projects from localStorage on mount
+  useEffect(() => {
+    const savedProjects = localStorage.getItem('projects');
+    if (savedProjects) {
+      setProjects(JSON.parse(savedProjects));
+    }
+  }, []);
+
+  // Save projects to localStorage when changed
+  useEffect(() => {
+    localStorage.setItem('projects', JSON.stringify(projects));
+  }, [projects]);
+
+  // When a project is selected, load its data
+  useEffect(() => {
+    if (currentProjectId) {
+      const projectDataStr = localStorage.getItem(`project-data-${currentProjectId}`);
+      const versionsStr = localStorage.getItem(`project-versions-${currentProjectId}`);
+      const currentVersionStr = localStorage.getItem(`current-version-${currentProjectId}`);
+      const activeFileStr = localStorage.getItem(`active-file-${currentProjectId}`);
+      if (projectDataStr) setProjectData(JSON.parse(projectDataStr));
+      if (versionsStr) setVersions(JSON.parse(versionsStr));
+      if (currentVersionStr) setCurrentVersion(currentVersionStr);
+      if (activeFileStr) setActiveFile(activeFileStr);
+      setShowProjectDashboard(false);
+    }
+  }, [currentProjectId]);
+
+  // Save project data to localStorage with project id
+  const saveProjectDataForCurrent = useCallback(() => {
+    if (!currentProjectId) return;
+    localStorage.setItem(`project-data-${currentProjectId}` , JSON.stringify(projectData));
+    localStorage.setItem(`project-versions-${currentProjectId}` , JSON.stringify(versions));
+    localStorage.setItem(`current-version-${currentProjectId}` , currentVersion);
+    localStorage.setItem(`active-file-${currentProjectId}` , activeFile || '');
+  }, [currentProjectId, projectData, versions, currentVersion, activeFile]);
+
+  // Call saveProjectDataForCurrent when relevant data changes
+  useEffect(() => {
+    saveProjectDataForCurrent();
+  }, [saveProjectDataForCurrent]);
 
   const createInitialVersion = useCallback(() => {
     const initialVersion: Version = {
@@ -275,6 +322,56 @@ function App() {
 
   const activeFileData = getActiveFileData();
 
+  // Add project creation logic
+  const createNewProject = (name: string) => {
+    const id = generateId();
+    setProjects(prev => [...prev, { id, name }]);
+    setCurrentProjectId(id);
+    // Reset project data for new project
+    setProjectData({ files: {}, folders: {} });
+    setVersions([]);
+    setCurrentVersion('');
+    setActiveFile(null);
+    setUnsavedChanges(false);
+  };
+
+  // In the dashboard UI, show project list and create button
+  if (showProjectDashboard) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-4">Project Dashboard</h1>
+          <div className="mb-6">
+            <button
+              className="px-4 py-2 bg-black text-white rounded"
+              onClick={() => {
+                const name = prompt('Enter project name:');
+                if (name) createNewProject(name);
+              }}
+            >
+              + New Project
+            </button>
+          </div>
+          <div className="max-w-md mx-auto">
+            <ul className="space-y-2">
+              {projects.map(project => (
+                <li key={project.id} className="flex items-center justify-between bg-white rounded shadow p-3">
+                  <span className="font-medium text-lg">{project.name}</span>
+                  <button
+                    className="ml-4 px-3 py-1 bg-green-600 text-white rounded"
+                    onClick={() => setCurrentProjectId(project.id)}
+                  >
+                    Open
+                  </button>
+                </li>
+              ))}
+              {projects.length === 0 && <li className="text-gray-500">No projects yet. Create one!</li>}
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
@@ -282,7 +379,7 @@ function App() {
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center space-x-2 mb-4">
             <FolderOpen className="h-6 w-6 text-blue-600" />
-            <h1 className="text-lg font-bold text-gray-900">Double Excel</h1>
+            <h1 className="text-lg font-bold text-gray-900">{projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}</h1>
           </div>
           
           <div className="flex space-x-2">
@@ -291,7 +388,7 @@ function App() {
                 const name = prompt('Enter file name:');
                 if (name) createNewFile(name, 'spreadsheet');
               }}
-              className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition-colors"
+              className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700 transition-colors"
             >
               <Plus className="h-4 w-4 mr-1" />
               New Sheet
@@ -327,6 +424,12 @@ function App() {
           <div className="px-6">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => setShowProjectDashboard(true)}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 mr-4"
+                >
+                  ← Back to Home
+                </button>
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900">
                     {activeFileData?.name || 'No file selected'}
@@ -341,7 +444,7 @@ function App() {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={createCheckpoint}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
                 >
                   <Save className="h-4 w-4 mr-1" />
                   Save Checkpoint
@@ -410,7 +513,7 @@ function App() {
                         const name = prompt('Enter file name:');
                         if (name) createNewFile(name, 'spreadsheet');
                       }}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700"
                     >
                       <Plus className="h-4 w-4 mr-1" />
                       New Spreadsheet

@@ -72,9 +72,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const renderFileIcon = (type: string) => {
     switch (type) {
       case 'spreadsheet':
-        return <FileSpreadsheet className="h-4 w-4 text-red-600" />;
+        return <FileSpreadsheet className="h-4 w-4 text-green-600" />;
       case 'chart':
-        return <BarChart3 className="h-4 w-4 text-red-600" />;
+        return <BarChart3 className="h-4 w-4 text-green-600" />;
       default:
         return <FileSpreadsheet className="h-4 w-4 text-gray-600" />;
     }
@@ -93,9 +93,9 @@ const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => toggleFolder(folder.id)}
         >
           {isExpanded ? (
-            <FolderOpen className="h-4 w-4 text-red-600" />
+            <FolderOpen className="h-4 w-4 text-green-600" />
           ) : (
-            <Folder className="h-4 w-4 text-red-600" />
+            <Folder className="h-4 w-4 text-green-600" />
           )}
           <span className="flex-1 truncate text-gray-900">{folder.name}</span>
         </div>
@@ -170,7 +170,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <button
               onClick={() => handleRename(contextMenu.fileId)}
-              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center space-x-2"
+              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-black flex items-center space-x-2"
             >
               <Edit className="h-4 w-4" />
               <span>Rename</span>

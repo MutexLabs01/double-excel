@@ -27,7 +27,7 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({
             className={`
               p-3 rounded-lg border transition-all duration-200
               ${version.id === currentVersion 
-                ? 'border-red-500 bg-red-50' 
+                ? 'border-black bg-black bg-opacity-10' 
                 : 'border-gray-200 bg-white hover:bg-gray-50'
               }
             `}
@@ -40,7 +40,7 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({
                     {version.name}
                   </h3>
                   {version.id === currentVersion && (
-                    <span className="inline-block px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+                    <span className="inline-block px-2 py-0.5 text-xs font-medium bg-black text-green-400 rounded-full">
                       Current
                     </span>
                   )}
@@ -64,7 +64,7 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({
             <div className="flex items-center space-x-2 mt-3">
               <button
                 onClick={() => onShowDiff(version.id)}
-                className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded hover:bg-red-200 transition-colors"
+                className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-black bg-opacity-90 rounded hover:bg-black hover:bg-opacity-100 transition-colors"
               >
                 <Eye className="h-3 w-3 mr-1" />
                 View Changes

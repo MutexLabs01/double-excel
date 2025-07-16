@@ -12,7 +12,7 @@ interface ChartEditorProps {
   projectData: ProjectData;
 }
 
-const COLORS = ['#EF4444', '#DC2626', '#B91C1C', '#991B1B', '#7F1D1D', '#FCA5A5', '#F87171', '#EF4444'];
+const COLORS = ['#22C55E', '#16A34A', '#15803D', '#166534', '#14532D', '#BBF7D0', '#4ADE80', '#22C55E'];
 
 const ChartEditor: React.FC<ChartEditorProps> = ({
   chartData,
@@ -245,7 +245,7 @@ const ChartEditor: React.FC<ChartEditorProps> = ({
                 onClick={() => updateChartData({ type: type as ChartData['type'] })}
                 className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                   localChartData.type === type
-                    ? 'bg-red-100 text-red-700 border border-red-300'
+                    ? 'bg-black text-white border border-green-300'
                     : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                 }`}
               >
@@ -376,7 +376,7 @@ const ChartEditor: React.FC<ChartEditorProps> = ({
                       onChange={(e) => updateChartData({
                         xAxis: { ...localChartData.xAxis, data: e.target.value.split('\n').filter(v => v.trim()) }
                       })}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                       rows={6}
                       placeholder="Label 1&#10;Label 2&#10;Label 3"
                     />
@@ -391,7 +391,7 @@ const ChartEditor: React.FC<ChartEditorProps> = ({
                       onChange={(e) => updateChartData({
                         yAxis: { ...localChartData.yAxis, data: e.target.value.split('\n').map(v => parseFloat(v.trim())).filter(v => !isNaN(v)) }
                       })}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                       rows={6}
                       placeholder="10&#10;20&#10;30"
                     />
