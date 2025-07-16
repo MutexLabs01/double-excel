@@ -6,7 +6,9 @@ import ChartEditor from './components/ChartEditor';
 import VersionHistory from './components/VersionHistory';
 import DiffViewer from './components/DiffViewer';
 import { ProjectData, Version, FileItem, SpreadsheetData } from './types/project';
-import { generateId, formatDate } from './utils/helpers';
+import { generateId, formatDate, spreadsheetDataToCSV } from './utils/helpers';
+import JSZip from 'jszip';
+import html2canvas from 'html2canvas';
 
 function App() {
   const [projectData, setProjectData] = useState<ProjectData>({
@@ -241,22 +243,67 @@ function App() {
     }
   }, [versions]);
 
-  const exportProject = useCallback(() => {
-    const exportData = {
-      projectData,
-      versions,
-      currentVersion,
-      exportDate: new Date().toISOString()
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const exportProject = useCallback(async () => {
+    const zip = new JSZip();
+    // Export all spreadsheets as CSV
+    Object.values(projectData.files).forEach(file => {
+      if (file.type === 'spreadsheet') {
+        const csv = spreadsheetDataToCSV(file.data);
+        zip.file(`${file.name || 'Sheet'}.csv`, csv);
+      }
+    });
+    // Export all charts as images
+    const chartNodes = document.querySelectorAll('.recharts-wrapper');
+    let chartIndex = 0;
+    for (const file of Object.values(projectData.files)) {
+      if (file.type === 'chart') {
+        const chartNode = chartNodes[chartIndex];
+        if (chartNode) {
+          // Use html2canvas to render chart as image
+          // Wait for chart to be visible
+          const canvas = await html2canvas(chartNode as HTMLElement);
+          const dataUrl = canvas.toDataURL('image/png');
+          zip.file(`${file.name || 'Chart'}.png`, dataUrl.split(',')[1], {base64: true});
+        }
+        chartIndex++;
+      }
+    }
+    // Generate zip and download
+    const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `project-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `${projects.find(p => p.id === currentProjectId)?.name || 'project'}-export.zip`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [projectData, versions, currentVersion]);
+  }, [projectData, projects, currentProjectId]);
+
+  // CSV import logic
+  const importCSV = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.name.endsWith('.csv')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        // Parse CSV to SpreadsheetData
+        const rows = text.split(/\r?\n/).map(row => row.split(','));
+        const data: any = {};
+        for (let r = 0; r < rows.length; r++) {
+          for (let c = 0; c < rows[r].length; c++) {
+            const value = rows[r][c].replace(/^"|"$/g, '').replace(/""/g, '"');
+            data[`${r}-${c}`] = { value, formula: null };
+          }
+        }
+        const name = file.name.replace(/\.csv$/, '');
+        createNewFile(name, 'spreadsheet');
+        // Wait for file to be created and set as active
+        setTimeout(() => {
+          if (activeFile) updateFileData(activeFile, data);
+        }, 100);
+      };
+      reader.readAsText(file);
+    }
+  }, [createNewFile, updateFileData, activeFile]);
 
   const importProject = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -471,8 +518,8 @@ function App() {
                   Import
                   <input
                     type="file"
-                    accept=".json"
-                    onChange={importProject}
+                    accept=".csv"
+                    onChange={importCSV}
                     className="hidden"
                   />
                 </label>

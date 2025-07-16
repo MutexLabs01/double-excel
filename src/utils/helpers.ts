@@ -51,3 +51,25 @@ export const parseRange = (range: string): { start: [number, number]; end: [numb
     end: parseCell(endCell || startCell)
   };
 };
+
+export function spreadsheetDataToCSV(data: {[key: string]: { value: string; formula: string | null }}): string {
+  // Find max row and col
+  let maxRow = 0, maxCol = 0;
+  Object.keys(data).forEach(key => {
+    const [row, col] = key.split('-').map(Number);
+    if (row > maxRow) maxRow = row;
+    if (col > maxCol) maxCol = col;
+  });
+  // Build 2D array
+  const rows: string[][] = [];
+  for (let r = 0; r <= maxRow; r++) {
+    const row: string[] = [];
+    for (let c = 0; c <= maxCol; c++) {
+      const cell = data[`${r}-${c}`];
+      row.push(cell ? (cell.value || '') : '');
+    }
+    rows.push(row);
+  }
+  // Convert to CSV
+  return rows.map(row => row.map(cell => '"' + cell.replace(/"/g, '""') + '"').join(',')).join('\n');
+}
