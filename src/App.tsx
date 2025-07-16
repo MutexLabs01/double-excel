@@ -9,12 +9,21 @@ import { ProjectData, Version, FileItem, SpreadsheetData } from './types/project
 import { generateId, formatDate, spreadsheetDataToCSV } from './utils/helpers';
 import JSZip from 'jszip';
 import html2canvas from 'html2canvas';
+import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser } from '@clerk/clerk-react';
 
 function App() {
+  const { user } = useUser();
   const [projectData, setProjectData] = useState<ProjectData>({
     files: {},
     folders: {}
   });
+
+  // Helper to get user-specific key
+  const getUserKey = (key: string) => {
+    return user ? `${user.id}:${key}` : key;
+  };
+
+
   const [versions, setVersions] = useState<Version[]>([]);
   const [currentVersion, setCurrentVersion] = useState<string>('');
   const [activeFile, setActiveFile] = useState<string | null>(null);
@@ -54,42 +63,45 @@ function App() {
     }
   }, []);
 
-  // Load projects from localStorage on mount
+  // Load projects from localStorage on mount or when user changes
   useEffect(() => {
-    const savedProjects = localStorage.getItem('projects');
+    if (!user) return;
+    const savedProjects = localStorage.getItem(getUserKey('projects'));
     if (savedProjects) {
       setProjects(JSON.parse(savedProjects));
+    } else {
+      setProjects([]);
     }
-  }, []);
+  }, [user]);
 
   // Save projects to localStorage when changed
   useEffect(() => {
-    localStorage.setItem('projects', JSON.stringify(projects));
-  }, [projects]);
+    if (!user) return;
+    localStorage.setItem(getUserKey('projects'), JSON.stringify(projects));
+  }, [projects, user]);
 
   // When a project is selected, load its data
   useEffect(() => {
-    if (currentProjectId) {
-      const projectDataStr = localStorage.getItem(`project-data-${currentProjectId}`);
-      const versionsStr = localStorage.getItem(`project-versions-${currentProjectId}`);
-      const currentVersionStr = localStorage.getItem(`current-version-${currentProjectId}`);
-      const activeFileStr = localStorage.getItem(`active-file-${currentProjectId}`);
-      if (projectDataStr) setProjectData(JSON.parse(projectDataStr));
-      if (versionsStr) setVersions(JSON.parse(versionsStr));
-      if (currentVersionStr) setCurrentVersion(currentVersionStr);
-      if (activeFileStr) setActiveFile(activeFileStr);
-      setShowProjectDashboard(false);
-    }
-  }, [currentProjectId]);
+    if (!user || !currentProjectId) return;
+    const projectDataStr = localStorage.getItem(getUserKey(`project-data-${currentProjectId}`));
+    const versionsStr = localStorage.getItem(getUserKey(`project-versions-${currentProjectId}`));
+    const currentVersionStr = localStorage.getItem(getUserKey(`current-version-${currentProjectId}`));
+    const activeFileStr = localStorage.getItem(getUserKey(`active-file-${currentProjectId}`));
+    if (projectDataStr) setProjectData(JSON.parse(projectDataStr));
+    if (versionsStr) setVersions(JSON.parse(versionsStr));
+    if (currentVersionStr) setCurrentVersion(currentVersionStr);
+    if (activeFileStr) setActiveFile(activeFileStr);
+    setShowProjectDashboard(false);
+  }, [currentProjectId, user]);
 
   // Save project data to localStorage with project id
   const saveProjectDataForCurrent = useCallback(() => {
-    if (!currentProjectId) return;
-    localStorage.setItem(`project-data-${currentProjectId}` , JSON.stringify(projectData));
-    localStorage.setItem(`project-versions-${currentProjectId}` , JSON.stringify(versions));
-    localStorage.setItem(`current-version-${currentProjectId}` , currentVersion);
-    localStorage.setItem(`active-file-${currentProjectId}` , activeFile || '');
-  }, [currentProjectId, projectData, versions, currentVersion, activeFile]);
+    if (!user || !currentProjectId) return;
+    localStorage.setItem(getUserKey(`project-data-${currentProjectId}`), JSON.stringify(projectData));
+    localStorage.setItem(getUserKey(`project-versions-${currentProjectId}`), JSON.stringify(versions));
+    localStorage.setItem(getUserKey(`current-version-${currentProjectId}`), currentVersion);
+    localStorage.setItem(getUserKey(`active-file-${currentProjectId}`), activeFile || '');
+  }, [user, currentProjectId, projectData, versions, currentVersion, activeFile]);
 
   // Call saveProjectDataForCurrent when relevant data changes
   useEffect(() => {
@@ -371,6 +383,7 @@ function App() {
 
   // Add project creation logic
   const createNewProject = (name: string) => {
+    if (!user) return;
     const id = generateId();
     setProjects(prev => [...prev, { id, name }]);
     setCurrentProjectId(id);
@@ -383,252 +396,254 @@ function App() {
   };
 
   // In the dashboard UI, show project list and create button
-  if (showProjectDashboard) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold mb-4">Project Dashboard</h1>
-          <div className="mb-6">
-            <button
-              className="px-4 py-2 bg-black text-white rounded"
-              onClick={() => {
-                const name = prompt('Enter project name:');
-                if (name) createNewProject(name);
-              }}
-            >
-              + New Project
-            </button>
-          </div>
-          <div className="max-w-md mx-auto">
-            <ul className="space-y-2">
-              {projects.map(project => (
-                <li key={project.id} className="flex items-center justify-between bg-white rounded shadow p-3">
-                  <span className="font-medium text-lg">{project.name}</span>
-                  <button
-                    className="ml-4 px-3 py-1 bg-green-600 text-white rounded"
-                    onClick={() => setCurrentProjectId(project.id)}
-                  >
-                    Open
-                  </button>
-                </li>
-              ))}
-              {projects.length === 0 && <li className="text-gray-500">No projects yet. Create one!</li>}
-            </ul>
-          </div>
-        </div>
-      </div>
-    );
-  }
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center space-x-2 mb-4">
-            <FolderOpen className="h-6 w-6 text-blue-600" />
-            <h1 className="text-lg font-bold text-gray-900">{projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}</h1>
-          </div>
-          
-          <div className="flex space-x-2">
-            <button
-              onClick={() => {
-                const name = prompt('Enter file name:');
-                if (name) createNewFile(name, 'spreadsheet');
-              }}
-              className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New Sheet
-            </button>
-            
-            <button
-              onClick={() => {
-                const name = prompt('Enter chart name:');
-                if (name) createNewFile(name, 'chart');
-              }}
-              className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New Chart
-            </button>
-          </div>
-        </div>
-
-        <Sidebar
-          projectData={projectData}
-          activeFile={activeFile}
-          onFileSelect={setActiveFile}
-          onFileDelete={deleteFile}
-          onFileRename={renameFile}
-          onCreateFolder={createNewFolder}
-        />
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b">
-          <div className="px-6">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center space-x-4">
+    <>
+      <SignedIn>
+        {showProjectDashboard ? (
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <h1 className="text-3xl font-bold mb-4">Project Dashboard</h1>
+              <div className="mb-6">
                 <button
-                  onClick={() => setShowProjectDashboard(true)}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 mr-4"
+                  className="px-4 py-2 bg-black text-white rounded"
+                  onClick={() => {
+                    const name = prompt('Enter project name:');
+                    if (name) createNewProject(name);
+                  }}
                 >
-                  ← Back to Home
+                  + New Project
                 </button>
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">
-                    {activeFileData?.name || 'No file selected'}
-                  </h2>
-                  <p className="text-sm text-gray-500">
-                    {activeFileData?.type === 'spreadsheet' ? 'Spreadsheet' : 'Chart'} • {getCurrentVersionName()}
-                    {unsavedChanges && <span className="text-amber-600 ml-2">• Unsaved changes</span>}
-                  </p>
-                </div>
               </div>
-              
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={createCheckpoint}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                >
-                  <Save className="h-4 w-4 mr-1" />
-                  Save Checkpoint
-                </button>
-                
-                <button
-                  onClick={() => setShowHistory(!showHistory)}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-                >
-                  <History className="h-4 w-4 mr-1" />
-                  History
-                </button>
-                
-                <button
-                  onClick={exportProject}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-                >
-                  <Download className="h-4 w-4 mr-1" />
-                  Export
-                </button>
-                
-                <label className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors cursor-pointer">
-                  <Upload className="h-4 w-4 mr-1" />
-                  Import
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={importCSV}
-                    className="hidden"
-                  />
-                </label>
+              <div className="max-w-md mx-auto">
+                <ul className="space-y-2">
+                  {projects.map(project => (
+                    <li key={project.id} className="flex items-center justify-between bg-white rounded shadow p-3">
+                      <span className="font-medium text-lg">{project.name}</span>
+                      <button
+                        className="ml-4 px-3 py-1 bg-green-600 text-white rounded"
+                        onClick={() => setCurrentProjectId(project.id)}
+                      >
+                        Open
+                      </button>
+                    </li>
+                  ))}
+                  {projects.length === 0 && <li className="text-gray-500">No projects yet. Create one!</li>}
+                </ul>
               </div>
             </div>
           </div>
-        </header>
-
-        {/* Content Area */}
-        <main className="flex-1 flex">
-          <div className={`flex-1 ${showHistory || showDiff ? 'lg:w-2/3' : 'w-full'}`}>
-            {activeFileData ? (
-              <div className="h-full bg-white">
-                {activeFileData.type === 'spreadsheet' ? (
-                  <Spreadsheet
-                    data={activeFileData.data as SpreadsheetData}
-                    onDataUpdate={(data) => updateFileData(activeFileData.id, data)}
-                    readonly={showDiff}
-                  />
-                ) : (
-                  <ChartEditor
-                    chartData={activeFileData.data}
-                    onDataUpdate={(data) => updateFileData(activeFileData.id, data)}
-                    spreadsheetFiles={getAllSpreadsheetFiles()}
-                    projectData={projectData}
-                  />
-                )}
+        ) : (
+          <div className="min-h-screen bg-gray-50 flex">
+            {/* Sidebar */}
+            <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center space-x-2 mb-4">
+                  <FolderOpen className="h-6 w-6 text-blue-600" />
+                  <h1 className="text-lg font-bold text-gray-900">{projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}</h1>
+                </div>
+                
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => {
+                      const name = prompt('Enter file name:');
+                      if (name) createNewFile(name, 'spreadsheet');
+                    }}
+                    className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    New Sheet
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      const name = prompt('Enter chart name:');
+                      if (name) createNewFile(name, 'chart');
+                    }}
+                    className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    New Chart
+                  </button>
+                </div>
               </div>
-            ) : (
-              <div className="h-full flex items-center justify-center bg-white">
-                <div className="text-center">
-                  <FolderOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No file selected</h3>
-                  <p className="text-gray-500 mb-4">Create a new spreadsheet or chart to get started</p>
-                  <div className="space-x-2">
-                    <button
-                      onClick={() => {
-                        const name = prompt('Enter file name:');
-                        if (name) createNewFile(name, 'spreadsheet');
-                      }}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      New Spreadsheet
-                    </button>
-                    <button
-                      onClick={() => {
-                        const name = prompt('Enter chart name:');
-                        if (name) createNewFile(name, 'chart');
-                      }}
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      New Chart
-                    </button>
+
+              <Sidebar
+                projectData={projectData}
+                activeFile={activeFile}
+                onFileSelect={setActiveFile}
+                onFileDelete={deleteFile}
+                onFileRename={renameFile}
+                onCreateFolder={createNewFolder}
+              />
+            </div>
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col">
+              {/* Header */}
+              <header className="bg-white shadow-sm border-b">
+                <div className="px-6">
+                  <div className="flex items-center justify-between h-16">
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={() => setShowProjectDashboard(true)}
+                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 mr-4"
+                      >
+                        ← Back to Home
+                      </button>
+                      <div>
+                        <h2 className="text-xl font-semibold text-gray-900">
+                          {activeFileData?.name || 'No file selected'}
+                        </h2>
+                        <p className="text-sm text-gray-500">
+                          {activeFileData?.type === 'spreadsheet' ? 'Spreadsheet' : 'Chart'} • {getCurrentVersionName()}
+                          {unsavedChanges && <span className="text-amber-600 ml-2">• Unsaved changes</span>}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <UserButton />
+                      <button
+                        onClick={createCheckpoint}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                      >
+                        <Save className="h-4 w-4 mr-1" />
+                        Save Checkpoint
+                      </button>
+                      <button
+                        onClick={() => setShowHistory(!showHistory)}
+                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                      >
+                        <History className="h-4 w-4 mr-1" />
+                        History
+                      </button>
+                      <button
+                        onClick={exportProject}
+                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Export
+                      </button>
+                      <label className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors cursor-pointer">
+                        <Upload className="h-4 w-4 mr-1" />
+                        Import
+                        <input
+                          type="file"
+                          accept=".csv"
+                          onChange={importCSV}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              </header>
+              {/* Content Area */}
+              <main className="flex-1 flex">
+                <div className={`flex-1 ${showHistory || showDiff ? 'lg:w-2/3' : 'w-full'}`}>
+                  {activeFileData ? (
+                    <div className="h-full bg-white">
+                      {activeFileData.type === 'spreadsheet' ? (
+                        <Spreadsheet
+                          data={activeFileData.data as SpreadsheetData}
+                          onDataUpdate={(data) => updateFileData(activeFileData.id, data)}
+                          readonly={showDiff}
+                        />
+                      ) : (
+                        <ChartEditor
+                          chartData={activeFileData.data}
+                          onDataUpdate={(data) => updateFileData(activeFileData.id, data)}
+                          spreadsheetFiles={getAllSpreadsheetFiles()}
+                          projectData={projectData}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center bg-white">
+                      <div className="text-center">
+                        <FolderOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No file selected</h3>
+                        <p className="text-gray-500 mb-4">Create a new spreadsheet or chart to get started</p>
+                        <div className="space-x-2">
+                          <button
+                            onClick={() => {
+                              const name = prompt('Enter file name:');
+                              if (name) createNewFile(name, 'spreadsheet');
+                            }}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            New Spreadsheet
+                          </button>
+                          <button
+                            onClick={() => {
+                              const name = prompt('Enter chart name:');
+                              if (name) createNewFile(name, 'chart');
+                            }}
+                            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            New Chart
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {/* History Panel */}
+                {showHistory && (
+                  <div className="w-80 bg-white border-l border-gray-200">
+                    <div className="p-4 border-b">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-semibold text-gray-900">Version History</h2>
+                        <button
+                          onClick={() => setShowHistory(false)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                    <VersionHistory
+                      versions={versions}
+                      currentVersion={currentVersion}
+                      onRestore={restoreVersion}
+                      onShowDiff={showDiffView}
+                    />
+                  </div>
+                )}
+                {/* Diff Viewer */}
+                {showDiff && (
+                  <div className="w-80 bg-white border-l border-gray-200">
+                    <div className="p-4 border-b">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-semibold text-gray-900">Changes</h2>
+                        <button
+                          onClick={() => setShowDiff(false)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                    <DiffViewer
+                      currentData={projectData}
+                      compareData={versions.find(v => v.id === compareVersion)?.projectData || { files: {}, folders: {} }}
+                      compareVersionName={versions.find(v => v.id === compareVersion)?.name || ''}
+                    />
+                  </div>
+                )}
+              </main>
+            </div>
           </div>
-
-          {/* History Panel */}
-          {showHistory && (
-            <div className="w-80 bg-white border-l border-gray-200">
-              <div className="p-4 border-b">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900">Version History</h2>
-                  <button
-                    onClick={() => setShowHistory(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-              <VersionHistory
-                versions={versions}
-                currentVersion={currentVersion}
-                onRestore={restoreVersion}
-                onShowDiff={showDiffView}
-              />
-            </div>
-          )}
-
-          {/* Diff Viewer */}
-          {showDiff && (
-            <div className="w-80 bg-white border-l border-gray-200">
-              <div className="p-4 border-b">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900">Changes</h2>
-                  <button
-                    onClick={() => setShowDiff(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-              <DiffViewer
-                currentData={projectData}
-                compareData={versions.find(v => v.id === compareVersion)?.projectData || { files: {}, folders: {} }}
-                compareVersionName={versions.find(v => v.id === compareVersion)?.name || ''}
-              />
-            </div>
-          )}
-        </main>
-      </div>
-    </div>
+        )}
+      </SignedIn>
+      <SignedOut>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <SignIn routing="hash" />
+        </div>
+      </SignedOut>
+    </>
   );
 }
+
 
 export default App;
