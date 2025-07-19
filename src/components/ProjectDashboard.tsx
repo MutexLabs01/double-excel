@@ -1,4 +1,5 @@
 import React from 'react';
+import NewsPanel from './NewsPanel';
 
 interface ProjectDashboardProps {
   projects: { id: string; name: string }[];
@@ -26,10 +27,12 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects, onCreateP
         {projects.length === 0 && <li className="text-gray-500">No projects yet. Create one!</li>}
       </ul>
     </aside>
+    
     {/* Main Content */}
-    <main className="flex-1 flex flex-col items-center justify-center">
-      <div className="text-center">
+    <main className="flex-1 flex flex-col items-center justify-center p-8">
+      <div className="text-center max-w-md">
         <h1 className="text-3xl font-bold mb-6">Project Dashboard</h1>
+        <p className="text-gray-600 mb-8">Create and manage your spreadsheet projects with ease.</p>
         <button
           className="px-6 py-3 bg-black text-white rounded-lg text-lg font-semibold shadow hover:bg-green-700 transition-colors"
           onClick={() => onShowModal('project', onCreateProject)}
@@ -38,6 +41,11 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects, onCreateP
         </button>
       </div>
     </main>
+    
+    {/* News Panel */}
+    <aside className="w-96 bg-gray-50 p-6 overflow-y-auto">
+      <NewsPanel />
+    </aside>
   </div>
 );
 
