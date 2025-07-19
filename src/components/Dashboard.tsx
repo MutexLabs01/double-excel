@@ -1,18 +1,39 @@
 import React from 'react';
 import NewsPanel from './NewsPanel';
+import Terminal from './Terminal';
 
-interface ProjectDashboardProps {
+interface DashboardProps {
   projects: { id: string; name: string }[];
+  currentProjectId: string | null;
+  projectData: any;
   onCreateProject: (name: string) => void;
   onOpenProject: (id: string) => void;
   onShowModal: (type: 'project' | 'sheet' | 'chart' | 'rename' | 'checkpoint', onSubmit: (name: string) => void) => void;
+  onExportFile?: (filename: string) => void;
 }
 
-const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects, onCreateProject, onOpenProject, onShowModal }) => (
+const Dashboard: React.FC<DashboardProps> = ({ 
+  projects, 
+  currentProjectId, 
+  projectData, 
+  onCreateProject, 
+  onOpenProject, 
+  onShowModal,
+  onExportFile 
+}) => (
   <div className="min-h-screen flex bg-gray-50">
     {/* Sidebar: Project List */}
     <aside className="w-80 bg-white border-r border-gray-200 flex flex-col p-6">
       <h2 className="text-xl font-bold mb-6 text-gray-900">Your Projects</h2>
+      
+      {/* New Project Button at Top */}
+      <button
+        className="w-full px-4 py-3 bg-black text-white rounded-lg text-lg font-semibold shadow hover:bg-green-700 transition-colors mb-4"
+        onClick={() => onShowModal('project', onCreateProject)}
+      >
+        + New Project
+      </button>
+      
       <ul className="space-y-2 flex-1 overflow-y-auto">
         {projects.map(project => (
           <li key={project.id}>
@@ -29,16 +50,16 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects, onCreateP
     </aside>
     
     {/* Main Content */}
-    <main className="flex-1 flex flex-col items-center justify-center p-8">
-      <div className="text-center max-w-md">
-        <h1 className="text-3xl font-bold mb-6">Project Dashboard</h1>
-        <p className="text-gray-600 mb-8">Create and manage your spreadsheet projects with ease.</p>
-        <button
-          className="px-6 py-3 bg-black text-white rounded-lg text-lg font-semibold shadow hover:bg-green-700 transition-colors"
-          onClick={() => onShowModal('project', onCreateProject)}
-        >
-          + New Project
-        </button>
+    <main className="flex-1 mt-3 flex flex-col items-center pt-0">
+      <h1 className="text-3xl mt-3 mb-12 font-semibold typewriter">DOUBLE-EXCEL</h1>
+      <div className="w-full max-w-3xl" style={{ height: '60vh', margin: '2rem' }}>
+        <Terminal
+          projects={projects}
+          currentProjectId={currentProjectId}
+          projectData={projectData}
+          onOpenProject={onOpenProject}
+          onExportFile={onExportFile}
+        />
       </div>
     </main>
     
@@ -49,4 +70,4 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects, onCreateP
   </div>
 );
 
-export default ProjectDashboard; 
+export default Dashboard; 

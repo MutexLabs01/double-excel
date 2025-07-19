@@ -11,7 +11,7 @@ import JSZip from 'jszip';
 import html2canvas from 'html2canvas';
 import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser } from '@clerk/clerk-react';
 import Modal from './components/Modal';
-import ProjectDashboard from './components/ProjectDashboard';
+import Dashboard from './components/Dashboard';
 import HeaderBar from './components/HeaderBar';
 import FileActionBar from './components/FileActionBar';
 import MainContent from './components/MainContent';
@@ -413,11 +413,17 @@ function App() {
     <>
       <SignedIn>
         {showProjectDashboard ? (
-          <ProjectDashboard
+          <Dashboard
             projects={projects}
+            currentProjectId={currentProjectId}
+            projectData={projectData}
             onCreateProject={createNewProject}
             onOpenProject={setCurrentProjectId}
             onShowModal={(type, onSubmit) => setModal({ type, onSubmit })}
+            onExportFile={(filename) => {
+              // Handle file export - you can implement this based on your export logic
+              console.log(`Exporting file: ${filename}`);
+            }}
           />
         ) : (
           <div className="min-h-screen bg-gray-50 flex">
