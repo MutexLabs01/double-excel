@@ -10,6 +10,7 @@ import { generateId, formatDate, spreadsheetDataToCSV } from './utils/helpers';
 import JSZip from 'jszip';
 import html2canvas from 'html2canvas';
 import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser } from '@clerk/clerk-react';
+import Modal from './components/Modal';
 
 function App() {
   const { user } = useUser();
@@ -36,6 +37,10 @@ function App() {
   // Add project management state
   const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  // Add modal state
+  const [modal, setModal] = useState<null | { type: 'project' | 'sheet' | 'chart' | 'rename' | 'checkpoint', onSubmit: (name: string, extra?: string) => void, initial?: string, extraLabel?: string }> (null);
+  const [modalInput, setModalInput] = useState('');
+  const [modalExtra, setModalExtra] = useState('');
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -222,25 +227,27 @@ function App() {
   }, []);
 
   const createCheckpoint = useCallback(() => {
-    const name = prompt('Enter checkpoint name:') || `Checkpoint ${versions.length + 1}`;
-    const description = prompt('Enter description (optional):') || '';
-    
-    const newVersion: Version = {
-      id: generateId(),
-      name,
-      timestamp: Date.now(),
-      projectData: JSON.parse(JSON.stringify(projectData)),
-      description
-    };
-
-    const updatedVersions = [...versions, newVersion];
-    setVersions(updatedVersions);
-    setCurrentVersion(newVersion.id);
-    setUnsavedChanges(false);
-    
-    localStorage.setItem('project-versions', JSON.stringify(updatedVersions));
-    localStorage.setItem('current-version', newVersion.id);
-    saveProjectData();
+    setModal({
+      type: 'checkpoint',
+      onSubmit: (name, description) => {
+        const newVersion: Version = {
+          id: generateId(),
+          name,
+          timestamp: Date.now(),
+          projectData: JSON.parse(JSON.stringify(projectData)),
+          description: description || ''
+        };
+        const updatedVersions = [...versions, newVersion];
+        setVersions(updatedVersions);
+        setCurrentVersion(newVersion.id);
+        setUnsavedChanges(false);
+        localStorage.setItem('project-versions', JSON.stringify(updatedVersions));
+        localStorage.setItem('current-version', newVersion.id);
+        saveProjectData();
+      },
+      initial: `Checkpoint ${versions.length + 1}`,
+      extraLabel: 'Description (optional)'
+    });
   }, [projectData, versions, saveProjectData]);
 
   const restoreVersion = useCallback((versionId: string) => {
@@ -406,10 +413,7 @@ function App() {
               <div className="mb-6">
                 <button
                   className="px-4 py-2 bg-black text-white rounded"
-                  onClick={() => {
-                    const name = prompt('Enter project name:');
-                    if (name) createNewProject(name);
-                  }}
+                  onClick={() => setModal({ type: 'project', onSubmit: (name) => createNewProject(name) })}
                 >
                   + New Project
                 </button>
@@ -445,8 +449,7 @@ function App() {
                 <div className="flex space-x-2">
                   <button
                     onClick={() => {
-                      const name = prompt('Enter file name:');
-                      if (name) createNewFile(name, 'spreadsheet');
+                      setModal({ type: 'sheet', onSubmit: (name) => createNewFile(name, 'spreadsheet') });
                     }}
                     className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700 transition-colors"
                   >
@@ -456,8 +459,7 @@ function App() {
                   
                   <button
                     onClick={() => {
-                      const name = prompt('Enter chart name:');
-                      if (name) createNewFile(name, 'chart');
+                      setModal({ type: 'chart', onSubmit: (name) => createNewFile(name, 'chart') });
                     }}
                     className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                   >
@@ -472,7 +474,7 @@ function App() {
                 activeFile={activeFile}
                 onFileSelect={setActiveFile}
                 onFileDelete={deleteFile}
-                onFileRename={renameFile}
+                onFileRename={(fileId, currentName) => setModal({ type: 'rename', onSubmit: (name) => renameFile(fileId, name), initial: currentName })}
                 onCreateFolder={createNewFolder}
               />
             </div>
@@ -641,6 +643,58 @@ function App() {
           <SignIn routing="hash" />
         </div>
       </SignedOut>
+      <Modal
+        open={!!modal}
+        onClose={() => { setModal(null); setModalInput(''); setModalExtra(''); }}
+        title={
+          modal?.type === 'project' ? 'Create Project'
+          : modal?.type === 'sheet' ? 'Create Sheet'
+          : modal?.type === 'chart' ? 'Create Chart'
+          : modal?.type === 'rename' ? 'Rename File'
+          : modal?.type === 'checkpoint' ? 'Create Checkpoint'
+          : ''
+        }
+        actions={[
+          <button
+            key="cancel"
+            className="px-4 py-2 rounded bg-gray-200 text-gray-700"
+            onClick={() => { setModal(null); setModalInput(''); setModalExtra(''); }}
+          >Cancel</button>,
+          <button
+            key="create"
+            className="px-4 py-2 rounded bg-green-600 text-white"
+            disabled={!modalInput.trim()}
+            onClick={() => {
+              if (modal && modalInput.trim()) {
+                modal.onSubmit(modalInput.trim(), modalExtra);
+                setModal(null); setModalInput(''); setModalExtra('');
+              }
+            }}
+          >{modal?.type === 'rename' ? 'Rename' : 'Create'}</button>
+        ]}
+      >
+        <input
+          autoFocus
+          className="w-full border rounded px-3 py-2 text-sm mb-2"
+          placeholder={modal?.type === 'rename' ? 'Enter new name...' : 'Enter name...'}
+          value={modalInput}
+          onChange={e => setModalInput(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && modal && modalInput.trim()) {
+              modal.onSubmit(modalInput.trim(), modalExtra);
+              setModal(null); setModalInput(''); setModalExtra('');
+            }
+          }}
+        />
+        {modal?.extraLabel && (
+          <input
+            className="w-full border rounded px-3 py-2 text-sm mt-2"
+            placeholder={modal.extraLabel}
+            value={modalExtra}
+            onChange={e => setModalExtra(e.target.value)}
+          />
+        )}
+      </Modal>
     </>
   );
 }

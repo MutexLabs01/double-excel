@@ -54,10 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleRename = (fileId: string) => {
     const file = projectData.files[fileId];
-    const newName = prompt('Enter new name:', file.name);
-    if (newName && newName !== file.name) {
-      onFileRename(fileId, newName);
-    }
+    onFileRename(fileId, file.name);
     closeContextMenu();
   };
 
