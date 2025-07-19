@@ -11,6 +11,12 @@ import JSZip from 'jszip';
 import html2canvas from 'html2canvas';
 import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser } from '@clerk/clerk-react';
 import Modal from './components/Modal';
+import ProjectDashboard from './components/ProjectDashboard';
+import HeaderBar from './components/HeaderBar';
+import FileActionBar from './components/FileActionBar';
+import MainContent from './components/MainContent';
+import HistoryPanel from './components/HistoryPanel';
+import DiffPanel from './components/DiffPanel';
 
 function App() {
   const { user } = useUser();
@@ -407,68 +413,21 @@ function App() {
     <>
       <SignedIn>
         {showProjectDashboard ? (
-          <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold mb-4">Project Dashboard</h1>
-              <div className="mb-6">
-                <button
-                  className="px-4 py-2 bg-black text-white rounded"
-                  onClick={() => setModal({ type: 'project', onSubmit: (name) => createNewProject(name) })}
-                >
-                  + New Project
-                </button>
-              </div>
-              <div className="max-w-md mx-auto">
-                <ul className="space-y-2">
-                  {projects.map(project => (
-                    <li key={project.id} className="flex items-center justify-between bg-white rounded shadow p-3">
-                      <span className="font-medium text-lg">{project.name}</span>
-                      <button
-                        className="ml-4 px-3 py-1 bg-green-600 text-white rounded"
-                        onClick={() => setCurrentProjectId(project.id)}
-                      >
-                        Open
-                      </button>
-                    </li>
-                  ))}
-                  {projects.length === 0 && <li className="text-gray-500">No projects yet. Create one!</li>}
-                </ul>
-              </div>
-            </div>
-          </div>
+          <ProjectDashboard
+            projects={projects}
+            onCreateProject={createNewProject}
+            onOpenProject={setCurrentProjectId}
+            onShowModal={(type, onSubmit) => setModal({ type, onSubmit })}
+          />
         ) : (
           <div className="min-h-screen bg-gray-50 flex">
             {/* Sidebar */}
             <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-              <div className="p-4 border-b border-gray-200">
-                <div className="flex items-center space-x-2 mb-4">
-                  <FolderOpen className="h-6 w-6 text-blue-600" />
-                  <h1 className="text-lg font-bold text-gray-900">{projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}</h1>
-                </div>
-                
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => {
-                      setModal({ type: 'sheet', onSubmit: (name) => createNewFile(name, 'spreadsheet') });
-                    }}
-                    className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700 transition-colors"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    New Sheet
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setModal({ type: 'chart', onSubmit: (name) => createNewFile(name, 'chart') });
-                    }}
-                    className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    New Chart
-                  </button>
-                </div>
-              </div>
-
+              <FileActionBar
+                projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
+                onNewSheet={() => setModal({ type: 'sheet', onSubmit: (name) => createNewFile(name, 'spreadsheet') })}
+                onNewChart={() => setModal({ type: 'chart', onSubmit: (name) => createNewFile(name, 'chart') })}
+              />
               <Sidebar
                 projectData={projectData}
                 activeFile={activeFile}
@@ -480,158 +439,46 @@ function App() {
             </div>
             {/* Main Content */}
             <div className="flex-1 flex flex-col">
-              {/* Header */}
-              <header className="bg-white shadow-sm border-b">
-                <div className="px-6">
-                  <div className="flex items-center justify-between h-16">
-                    <div className="flex items-center space-x-4">
-                      <button
-                        onClick={() => setShowProjectDashboard(true)}
-                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 mr-4"
-                      >
-                        ← Back to Home
-                      </button>
-                      <div>
-                        <h2 className="text-xl font-semibold text-gray-900">
-                          {activeFileData?.name || 'No file selected'}
-                        </h2>
-                        <p className="text-sm text-gray-500">
-                          {activeFileData?.type === 'spreadsheet' ? 'Spreadsheet' : 'Chart'} • {getCurrentVersionName()}
-                          {unsavedChanges && <span className="text-amber-600 ml-2">• Unsaved changes</span>}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <UserButton />
-                      <button
-                        onClick={createCheckpoint}
-                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                      >
-                        <Save className="h-4 w-4 mr-1" />
-                        Save Checkpoint
-                      </button>
-                      <button
-                        onClick={() => setShowHistory(!showHistory)}
-                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-                      >
-                        <History className="h-4 w-4 mr-1" />
-                        History
-                      </button>
-                      <button
-                        onClick={exportProject}
-                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Export
-                      </button>
-                      <label className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors cursor-pointer">
-                        <Upload className="h-4 w-4 mr-1" />
-                        Import
-                        <input
-                          type="file"
-                          accept=".csv"
-                          onChange={importCSV}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </header>
-              {/* Content Area */}
+              <HeaderBar
+                projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
+                fileName={activeFileData?.name || ''}
+                fileType={activeFileData?.type === 'spreadsheet' ? 'Spreadsheet' : 'Chart'}
+                versionName={getCurrentVersionName()}
+                unsavedChanges={unsavedChanges}
+                onBack={() => setShowProjectDashboard(true)}
+                onSave={createCheckpoint}
+                onShowHistory={() => setShowHistory(!showHistory)}
+                onExport={exportProject}
+                onImport={importCSV}
+                showHistory={showHistory}
+              />
               <main className="flex-1 flex">
                 <div className={`flex-1 ${showHistory || showDiff ? 'lg:w-2/3' : 'w-full'}`}>
-                  {activeFileData ? (
-                    <div className="h-full bg-white">
-                      {activeFileData.type === 'spreadsheet' ? (
-                        <Spreadsheet
-                          data={activeFileData.data as SpreadsheetData}
-                          onDataUpdate={(data) => updateFileData(activeFileData.id, data)}
-                          readonly={showDiff}
-                        />
-                      ) : (
-                        <ChartEditor
-                          chartData={activeFileData.data}
-                          onDataUpdate={(data) => updateFileData(activeFileData.id, data)}
-                          spreadsheetFiles={getAllSpreadsheetFiles()}
-                          projectData={projectData}
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <div className="h-full flex items-center justify-center bg-white">
-                      <div className="text-center">
-                        <FolderOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No file selected</h3>
-                        <p className="text-gray-500 mb-4">Create a new spreadsheet or chart to get started</p>
-                        <div className="space-x-2">
-                          <button
-                            onClick={() => {
-                              const name = prompt('Enter file name:');
-                              if (name) createNewFile(name, 'spreadsheet');
-                            }}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700"
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            New Spreadsheet
-                          </button>
-                          <button
-                            onClick={() => {
-                              const name = prompt('Enter chart name:');
-                              if (name) createNewFile(name, 'chart');
-                            }}
-                            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            New Chart
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <MainContent
+                    activeFileData={activeFileData}
+                    updateFileData={updateFileData}
+                    getAllSpreadsheetFiles={getAllSpreadsheetFiles}
+                    projectData={projectData}
+                    createNewFile={createNewFile}
+                    showDiff={showDiff}
+                  />
                 </div>
-                {/* History Panel */}
                 {showHistory && (
-                  <div className="w-80 bg-white border-l border-gray-200">
-                    <div className="p-4 border-b">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold text-gray-900">Version History</h2>
-                        <button
-                          onClick={() => setShowHistory(false)}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                    <VersionHistory
-                      versions={versions}
-                      currentVersion={currentVersion}
-                      onRestore={restoreVersion}
-                      onShowDiff={showDiffView}
-                    />
-                  </div>
+                  <HistoryPanel
+                    versions={versions}
+                    currentVersion={currentVersion}
+                    onRestore={restoreVersion}
+                    onShowDiff={showDiffView}
+                    onClose={() => setShowHistory(false)}
+                  />
                 )}
-                {/* Diff Viewer */}
                 {showDiff && (
-                  <div className="w-80 bg-white border-l border-gray-200">
-                    <div className="p-4 border-b">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold text-gray-900">Changes</h2>
-                        <button
-                          onClick={() => setShowDiff(false)}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                    <DiffViewer
-                      currentData={projectData}
-                      compareData={versions.find(v => v.id === compareVersion)?.projectData || { files: {}, folders: {} }}
-                      compareVersionName={versions.find(v => v.id === compareVersion)?.name || ''}
-                    />
-                  </div>
+                  <DiffPanel
+                    projectData={projectData}
+                    versions={versions}
+                    compareVersion={compareVersion}
+                    onClose={() => setShowDiff(false)}
+                  />
                 )}
               </main>
             </div>
