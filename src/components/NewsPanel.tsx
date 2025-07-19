@@ -5,10 +5,11 @@ interface NewsArticle {
   title: string;
   description: string;
   url: string;
-  urlToImage: string;
+  image: string;
   publishedAt: string;
   source: {
     name: string;
+    url: string;
   };
 }
 
@@ -25,16 +26,18 @@ const NewsPanel: React.FC<NewsPanelProps> = ({ className = '' }) => {
     const fetchNews = async () => {
       try {
         setLoading(true);
-        const apiKey = import.meta.env.VITE_NEWS_API_KEY;
+        const apiKey = import.meta.env.VITE_GNEWS_API_KEY;
         
         if (!apiKey) {
-          setError('News API key not found. Please add VITE_NEWS_API_KEY to your .env file.');
+          setError('GNews API key not found. Please add VITE_GNEWS_API_KEY to your .env file.');
           setLoading(false);
           return;
         }
 
+        // GNews API: https://gnews.io/docs/
+        // Example: https://gnews.io/api/v4/top-headlines?token=API_KEY&lang=en&topic=technology&max=5
         const response = await fetch(
-          `https://newsapi.org/v2/top-headlines?country=us&category=technology&pageSize=5&apiKey=${apiKey}`
+          `https://gnews.io/api/v4/top-headlines?token=${apiKey}&lang=en&topic=technology&max=5`
         );
 
         if (!response.ok) {
@@ -43,7 +46,7 @@ const NewsPanel: React.FC<NewsPanelProps> = ({ className = '' }) => {
 
         const data = await response.json();
         
-        if (data.status === 'error') {
+        if (!data.articles) {
           throw new Error(data.message || 'Failed to fetch news');
         }
 
@@ -91,7 +94,7 @@ const NewsPanel: React.FC<NewsPanelProps> = ({ className = '' }) => {
         <div className="text-red-600 text-sm">
           <p>Unable to load news: {error}</p>
           <p className="mt-2 text-gray-600">
-            Make sure you have added VITE_NEWS_API_KEY to your .env file
+            Make sure you have added VITE_GNEWS_API_KEY to your .env file
           </p>
         </div>
       </div>
@@ -108,9 +111,9 @@ const NewsPanel: React.FC<NewsPanelProps> = ({ className = '' }) => {
         {news.map((article, index) => (
           <article key={index} className="border-b border-gray-100 pb-4 last:border-b-0">
             <div className="flex items-start space-x-3">
-              {article.urlToImage && (
+              {article.image && (
                 <img
-                  src={article.urlToImage}
+                  src={article.image}
                   alt={article.title}
                   className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
                   onError={(e) => {
