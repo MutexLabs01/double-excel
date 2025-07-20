@@ -1,6 +1,7 @@
 import React from 'react';
 import NewsPanel from './NewsPanel';
 import Terminal from './Terminal';
+import TypewriterEffect from './TypewriterEffect';
 
 interface DashboardProps {
   projects: { id: string; name: string }[];
@@ -51,7 +52,16 @@ const Dashboard: React.FC<DashboardProps> = ({
     
     {/* Main Content */}
     <main className="flex-1 mt-3 flex flex-col items-center pt-0">
-      <h1 className="text-3xl mt-3 mb-12 font-semibold typewriter">DOUBLE-EXCEL</h1>
+      <div className="text-5xl mt-3 mb-12 text-gray-900 font-extrabold">
+        <TypewriterEffect 
+          text="DOUBLE EXCEL" 
+          speed={120} 
+          delay={800}
+          className="text-gray-900"
+          repeat={true}
+          repeatDelay={5000}
+        />
+      </div>
       <div className="w-full max-w-3xl" style={{ height: '60vh', margin: '2rem' }}>
         <Terminal
           projects={projects}
