@@ -159,7 +159,7 @@ const calculateIf = (args: string, data: SpreadsheetData): number => {
 const evaluateCondition = (condition: string, data: SpreadsheetData): boolean => {
   // Simple condition parser (in a real app, use a proper parser)
   const operators = ['>=', '<=', '>', '<', '=', '!='];
-  let operator = operators.find(op => condition.includes(op));
+  const operator = operators.find(op => condition.includes(op));
   
   if (!operator) return false;
   
