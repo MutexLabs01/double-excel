@@ -17,6 +17,7 @@ import FileActionBar from './components/FileActionBar';
 import MainContent from './components/MainContent';
 import HistoryPanel from './components/HistoryPanel';
 import DiffPanel from './components/DiffPanel';
+import FinancialModeling from './components/FinancialModeling';
 
 function App() {
   const { user } = useUser();
@@ -44,7 +45,7 @@ function App() {
   const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   // Add modal state
-  const [modal, setModal] = useState<null | { type: 'project' | 'sheet' | 'chart' | 'rename' | 'checkpoint', onSubmit: (name: string, extra?: string) => void, initial?: string, extraLabel?: string }> (null);
+  const [modal, setModal] = useState<null | { type: 'project' | 'sheet' | 'chart' | 'financial_model' | 'rename' | 'checkpoint', onSubmit: (name: string, extra?: string) => void, initial?: string, extraLabel?: string }> (null);
   const [modalInput, setModalInput] = useState('');
   const [modalExtra, setModalExtra] = useState('');
 
@@ -137,7 +138,7 @@ function App() {
     localStorage.setItem('project-data', JSON.stringify(projectData));
   }, [projectData]);
 
-  const createNewFile = useCallback((name: string, type: 'spreadsheet' | 'chart', parentFolder?: string) => {
+  const createNewFile = useCallback((name: string, type: 'spreadsheet' | 'chart' | 'financial_model', parentFolder?: string) => {
     const fileId = generateId();
     const newFile: FileItem = {
       id: fileId,
@@ -273,7 +274,7 @@ function App() {
     // Export all spreadsheets as CSV
     Object.values(projectData.files).forEach(file => {
       if (file.type === 'spreadsheet') {
-        const csv = spreadsheetDataToCSV(file.data);
+        const csv = spreadsheetDataToCSV(file.data as SpreadsheetData);
         zip.file(`${file.name || 'Sheet'}.csv`, csv);
       }
     });
@@ -433,6 +434,7 @@ function App() {
                 projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
                 onNewSheet={() => setModal({ type: 'sheet', onSubmit: (name) => createNewFile(name, 'spreadsheet') })}
                 onNewChart={() => setModal({ type: 'chart', onSubmit: (name) => createNewFile(name, 'chart') })}
+                onNewFinancialModel={() => setModal({ type: 'financial_model', onSubmit: (name) => createNewFile(name, 'financial_model') })}
               />
               <Sidebar
                 projectData={projectData}
@@ -503,6 +505,7 @@ function App() {
           modal?.type === 'project' ? 'Create Project'
           : modal?.type === 'sheet' ? 'Create Sheet'
           : modal?.type === 'chart' ? 'Create Chart'
+          : modal?.type === 'financial_model' ? 'Create Financial Model'
           : modal?.type === 'rename' ? 'Rename File'
           : modal?.type === 'checkpoint' ? 'Create Checkpoint'
           : ''

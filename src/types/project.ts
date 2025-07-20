@@ -28,8 +28,8 @@ export interface ChartData {
 export interface FileItem {
   id: string;
   name: string;
-  type: 'spreadsheet' | 'chart';
-  data: SpreadsheetData | ChartData;
+  type: 'spreadsheet' | 'chart' | 'financial_model';
+  data: SpreadsheetData | ChartData | FinancialModel;
   parentFolder?: string;
   createdAt: number;
   modifiedAt: number;
@@ -59,3 +59,6 @@ export interface FormulaError {
   message: string;
   cell: string;
 }
+
+// Import financial types
+import { FinancialModel } from './financial';
