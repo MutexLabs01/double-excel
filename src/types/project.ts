@@ -45,6 +45,8 @@ export interface FolderItem {
 export interface ProjectData {
   files: { [key: string]: FileItem };
   folders: { [key: string]: FolderItem };
+  owner?: string; // user id or email of the creator
+  sharedWith?: string[]; // array of user ids or emails with access
 }
 
 export interface Version {

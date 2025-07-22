@@ -14,6 +14,8 @@ interface HeaderBarProps {
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   showHistory: boolean;
+  onShare?: () => void;
+  shareLink?: string;
 }
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -27,7 +29,9 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   onShowHistory,
   onExport,
   onImport,
-  showHistory
+  showHistory,
+  onShare,
+  shareLink
 }) => (
   <header className="bg-white shadow-sm border-b">
     <div className="px-6">
@@ -80,8 +84,21 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
               className="hidden"
             />
           </label>
+          {onShare && (
+            <button
+              onClick={onShare}
+              className="inline-flex items-center px-3 py-2 border border-blue-500 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            >
+              Share
+            </button>
+          )}
         </div>
       </div>
+      {shareLink && (
+        <div className="mt-2 text-blue-700 text-sm">
+          Share this link: <a href={shareLink} className="underline" target="_blank" rel="noopener noreferrer">{shareLink}</a>
+        </div>
+      )}
     </div>
   </header>
 );

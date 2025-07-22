@@ -18,6 +18,7 @@ import MainContent from './components/MainContent';
 import HistoryPanel from './components/HistoryPanel';
 import DiffPanel from './components/DiffPanel';
 import FinancialModeling from './components/FinancialModeling';
+import { RoomProvider } from '@liveblocks/react';
 
 function App() {
   const { user } = useUser();
@@ -48,6 +49,7 @@ function App() {
   const [modal, setModal] = useState<null | { type: 'project' | 'sheet' | 'chart' | 'financial_model' | 'rename' | 'checkpoint', onSubmit: (name: string, extra?: string) => void, initial?: string, extraLabel?: string }> (null);
   const [modalInput, setModalInput] = useState('');
   const [modalExtra, setModalExtra] = useState('');
+  const [shareLink, setShareLink] = useState<string | null>(null);
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -396,30 +398,76 @@ function App() {
   const activeFileData = getActiveFileData();
 
   // Add project creation logic
-  const createNewProject = (name: string) => {
+  const createNewProject = useCallback((name: string) => {
     if (!user) return;
     const id = generateId();
     setProjects(prev => [...prev, { id, name }]);
     setCurrentProjectId(id);
-    // Reset project data for new project
-    setProjectData({ files: {}, folders: {} });
+    // Use primaryEmailAddress if available, otherwise fallback to user.id
+    const ownerId = user.primaryEmailAddress?.emailAddress || user.id;
+    setProjectData({ files: {}, folders: {}, owner: ownerId, sharedWith: [] });
     setVersions([]);
     setCurrentVersion('');
     setActiveFile(null);
     setUnsavedChanges(false);
-  };
+  }, [user]);
+
+  // Add a function to share the project
+  const shareProject = useCallback((email: string) => {
+    if (!user || !currentProjectId) return;
+    setProjectData(prev => {
+      const sharedWith = prev.sharedWith ? [...prev.sharedWith] : [];
+      if (!sharedWith.includes(email)) {
+        sharedWith.push(email);
+      }
+      return { ...prev, sharedWith };
+    });
+  }, [user, currentProjectId]);
+
+  // Add a function to check if user has access
+  const userHasAccess = useCallback(() => {
+    if (!user || !currentProjectId) return false;
+    const userIdOrEmail = user.primaryEmailAddress?.emailAddress || user.id;
+    if (projectData.owner === userIdOrEmail) return true;
+    if (projectData.sharedWith && projectData.sharedWith.includes(userIdOrEmail)) return true;
+    return false;
+  }, [user, currentProjectId, projectData]);
+
+  // On mount, check if URL is /projects/:id and set currentProjectId
+  useEffect(() => {
+    const match = window.location.pathname.match(/^\/projects\/(.+)$/);
+    if (match) {
+      setCurrentProjectId(match[1]);
+      setShowProjectDashboard(false);
+    }
+  }, []);
+  // When a project is opened, update the URL
+  const handleOpenProject = useCallback((id: string) => {
+    setCurrentProjectId(id);
+    setShowProjectDashboard(false);
+    window.history.pushState({}, '', `/projects/${id}`);
+  }, []);
+
+  const handleShare = useCallback(() => {
+    if (!currentProjectId) return;
+    const email = prompt('Enter email to share this project with:');
+    if (email) {
+      shareProject(email);
+      setShareLink(window.location.origin + '/projects/' + currentProjectId);
+    }
+  }, [currentProjectId, shareProject]);
 
   // In the dashboard UI, show project list and create button
   return (
     <>
       <SignedIn>
-        {showProjectDashboard ? (
+        {showProjectDashboard || !currentProjectId ? (
           <Dashboard
             projects={projects}
             currentProjectId={currentProjectId}
             projectData={projectData}
             onCreateProject={createNewProject}
-            onOpenProject={setCurrentProjectId}
+            onOpenProject={handleOpenProject}
             onShowModal={(type, onSubmit) => setModal({ type, onSubmit })}
             onExportFile={(filename) => {
               // Handle file export - you can implement this based on your export logic
@@ -427,70 +475,74 @@ function App() {
             }}
           />
         ) : (
-          <div className="min-h-screen bg-gray-50 flex">
-            {/* Sidebar */}
-            <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-              <FileActionBar
-                projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
-                onNewSheet={() => setModal({ type: 'sheet', onSubmit: (name) => createNewFile(name, 'spreadsheet') })}
-                onNewChart={() => setModal({ type: 'chart', onSubmit: (name) => createNewFile(name, 'chart') })}
-                onNewFinancialModel={() => setModal({ type: 'financial_model', onSubmit: (name) => createNewFile(name, 'financial_model') })}
-              />
-              <Sidebar
-                projectData={projectData}
-                activeFile={activeFile}
-                onFileSelect={setActiveFile}
-                onFileDelete={deleteFile}
-                onFileRename={(fileId, currentName) => setModal({ type: 'rename', onSubmit: (name) => renameFile(fileId, name), initial: currentName })}
-                onCreateFolder={createNewFolder}
-              />
+          <RoomProvider id={currentProjectId} initialPresence={{ user: user?.primaryEmailAddress?.emailAddress || user?.id }}>
+            <div className="min-h-screen bg-gray-50 flex">
+              {/* Sidebar */}
+              <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+                <FileActionBar
+                  projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
+                  onNewSheet={() => setModal({ type: 'sheet', onSubmit: (name) => createNewFile(name, 'spreadsheet') })}
+                  onNewChart={() => setModal({ type: 'chart', onSubmit: (name) => createNewFile(name, 'chart') })}
+                  onNewFinancialModel={() => setModal({ type: 'financial_model', onSubmit: (name) => createNewFile(name, 'financial_model') })}
+                />
+                <Sidebar
+                  projectData={projectData}
+                  activeFile={activeFile}
+                  onFileSelect={setActiveFile}
+                  onFileDelete={deleteFile}
+                  onFileRename={(fileId, currentName) => setModal({ type: 'rename', onSubmit: (name) => renameFile(fileId, name), initial: currentName })}
+                  onCreateFolder={createNewFolder}
+                />
+              </div>
+              {/* Main Content */}
+              <div className="flex-1 flex flex-col">
+                <HeaderBar
+                  projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
+                  fileName={activeFileData?.name || ''}
+                  fileType={activeFileData?.type === 'spreadsheet' ? 'Spreadsheet' : 'Chart'}
+                  versionName={getCurrentVersionName()}
+                  unsavedChanges={unsavedChanges}
+                  onBack={() => setShowProjectDashboard(true)}
+                  onSave={createCheckpoint}
+                  onShowHistory={() => setShowHistory(!showHistory)}
+                  onExport={exportProject}
+                  onImport={importCSV}
+                  showHistory={showHistory}
+                  onShare={handleShare}
+                  shareLink={shareLink || undefined}
+                />
+                <main className="flex-1 flex">
+                  <div className={`flex-1 ${showHistory || showDiff ? 'lg:w-2/3' : 'w-full'}`}>
+                    <MainContent
+                      activeFileData={activeFileData}
+                      updateFileData={updateFileData}
+                      getAllSpreadsheetFiles={getAllSpreadsheetFiles}
+                      projectData={projectData}
+                      createNewFile={createNewFile}
+                      showDiff={showDiff}
+                    />
+                  </div>
+                  {showHistory && (
+                    <HistoryPanel
+                      versions={versions}
+                      currentVersion={currentVersion}
+                      onRestore={restoreVersion}
+                      onShowDiff={showDiffView}
+                      onClose={() => setShowHistory(false)}
+                    />
+                  )}
+                  {showDiff && (
+                    <DiffPanel
+                      projectData={projectData}
+                      versions={versions}
+                      compareVersion={compareVersion}
+                      onClose={() => setShowDiff(false)}
+                    />
+                  )}
+                </main>
+              </div>
             </div>
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col">
-              <HeaderBar
-                projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
-                fileName={activeFileData?.name || ''}
-                fileType={activeFileData?.type === 'spreadsheet' ? 'Spreadsheet' : 'Chart'}
-                versionName={getCurrentVersionName()}
-                unsavedChanges={unsavedChanges}
-                onBack={() => setShowProjectDashboard(true)}
-                onSave={createCheckpoint}
-                onShowHistory={() => setShowHistory(!showHistory)}
-                onExport={exportProject}
-                onImport={importCSV}
-                showHistory={showHistory}
-              />
-              <main className="flex-1 flex">
-                <div className={`flex-1 ${showHistory || showDiff ? 'lg:w-2/3' : 'w-full'}`}>
-                  <MainContent
-                    activeFileData={activeFileData}
-                    updateFileData={updateFileData}
-                    getAllSpreadsheetFiles={getAllSpreadsheetFiles}
-                    projectData={projectData}
-                    createNewFile={createNewFile}
-                    showDiff={showDiff}
-                  />
-                </div>
-                {showHistory && (
-                  <HistoryPanel
-                    versions={versions}
-                    currentVersion={currentVersion}
-                    onRestore={restoreVersion}
-                    onShowDiff={showDiffView}
-                    onClose={() => setShowHistory(false)}
-                  />
-                )}
-                {showDiff && (
-                  <DiffPanel
-                    projectData={projectData}
-                    versions={versions}
-                    compareVersion={compareVersion}
-                    onClose={() => setShowDiff(false)}
-                  />
-                )}
-              </main>
-            </div>
-          </div>
+          </RoomProvider>
         )}
       </SignedIn>
       <SignedOut>
