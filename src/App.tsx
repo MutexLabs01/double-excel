@@ -616,11 +616,15 @@ function ProjectRoom({
     storage.set("project", new LiveObject(newProjectData));
   }, []);
 
+  // Only allow mutations if storage is loaded
+  const canMutate = !!liveblocksProject;
+
   // All project data reads/writes go through Liveblocks
   const effectiveProjectData = liveblocksProject || { files: {}, folders: {} };
 
-  // File operations
+  // File operations with guards
   const wrappedUpdateFileData = (fileId: any, data: any) => {
+    if (!canMutate) return;
     setLiveblocksProject({
       ...effectiveProjectData,
       files: {
@@ -634,6 +638,7 @@ function ProjectRoom({
     });
   };
   const wrappedCreateNewFile = (name: any, type: any, parentFolder?: any) => {
+    if (!canMutate) return;
     const fileId = generateId();
     const newFile = {
       id: fileId,
@@ -661,6 +666,7 @@ function ProjectRoom({
     return fileId;
   };
   const wrappedCreateNewFolder = (name: any, parentFolder?: any) => {
+    if (!canMutate) return;
     const folderId = generateId();
     setLiveblocksProject({
       ...effectiveProjectData,
@@ -676,6 +682,7 @@ function ProjectRoom({
     });
   };
   const wrappedDeleteFile = (fileId: any) => {
+    if (!canMutate) return;
     const newFiles = { ...effectiveProjectData.files };
     delete newFiles[fileId];
     setLiveblocksProject({
@@ -684,6 +691,7 @@ function ProjectRoom({
     });
   };
   const wrappedRenameFile = (fileId: any, newName: any) => {
+    if (!canMutate) return;
     setLiveblocksProject({
       ...effectiveProjectData,
       files: {
@@ -708,15 +716,14 @@ function ProjectRoom({
 
   // Export project logic
   const exportProject = useCallback(async () => {
+    if (!canMutate) return;
     const zip = new JSZip();
-    // Export all spreadsheets as CSV
     Object.values(effectiveProjectData.files).forEach((file: any) => {
       if (file.type === 'spreadsheet') {
         const csv = spreadsheetDataToCSV(file.data as SpreadsheetData);
         zip.file(`${file.name || 'Sheet'}.csv`, csv);
       }
     });
-    // Export all charts as images
     const chartNodes = document.querySelectorAll('.recharts-wrapper');
     let chartIndex = 0;
     for (const file of Object.values(effectiveProjectData.files)) {
@@ -737,10 +744,11 @@ function ProjectRoom({
     a.download = `${projects.find(p => p.id === currentProjectId)?.name || 'project'}-export.zip`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [effectiveProjectData, projects, currentProjectId]);
+  }, [effectiveProjectData, projects, currentProjectId, canMutate]);
 
   // CSV import logic
   const importCSV = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canMutate) return;
     const file = event.target.files?.[0];
     if (file && file.name.endsWith('.csv')) {
       const reader = new FileReader();
@@ -762,11 +770,20 @@ function ProjectRoom({
       };
       reader.readAsText(file);
     }
-  }, [wrappedCreateNewFile, wrappedUpdateFileData]);
+  }, [wrappedCreateNewFile, wrappedUpdateFileData, canMutate]);
 
   // Compute activeFile state locally for this room
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const activeFileData = getActiveFileData(activeFile);
+
+  // Show loading spinner/message if storage is not loaded
+  if (!canMutate) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-gray-500 text-lg">Loading project data...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -777,14 +794,15 @@ function ProjectRoom({
           onNewSheet={() => setModal({ type: 'sheet', onSubmit: (name: string) => wrappedCreateNewFile(name, 'spreadsheet') })}
           onNewChart={() => setModal({ type: 'chart', onSubmit: (name: string) => wrappedCreateNewFile(name, 'chart') })}
           onNewFinancialModel={() => setModal({ type: 'financial_model', onSubmit: (name: string) => wrappedCreateNewFile(name, 'financial_model') })}
+          disabled={!canMutate}
         />
         <Sidebar
           projectData={effectiveProjectData}
           activeFile={activeFile}
-          onFileSelect={setActiveFile}
-          onFileDelete={wrappedDeleteFile}
-          onFileRename={(fileId, currentName) => setModal({ type: 'rename', onSubmit: (name: string) => wrappedRenameFile(fileId, name), initial: currentName })}
-          onCreateFolder={wrappedCreateNewFolder}
+          onFileSelect={canMutate ? setActiveFile : undefined}
+          onFileDelete={canMutate ? wrappedDeleteFile : undefined}
+          onFileRename={canMutate ? (fileId, currentName) => setModal({ type: 'rename', onSubmit: (name: string) => wrappedRenameFile(fileId, name), initial: currentName }) : undefined}
+          onCreateFolder={canMutate ? wrappedCreateNewFolder : undefined}
         />
       </div>
       {/* Main Content */}
