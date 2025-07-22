@@ -18,14 +18,20 @@ import MainContent from './components/MainContent';
 import HistoryPanel from './components/HistoryPanel';
 import DiffPanel from './components/DiffPanel';
 import FinancialModeling from './components/FinancialModeling';
-import { RoomProvider } from '@liveblocks/react';
+import { RoomProvider, useStorage, useMutation } from '@liveblocks/react';
+import { LiveObject } from '@liveblocks/client';
 
 function App() {
   const { user } = useUser();
-  const [projectData, setProjectData] = useState<ProjectData>({
-    files: {},
-    folders: {}
-  });
+  // Use Liveblocks storage for projectData
+  // const liveblocksProjectData = useStorage<ProjectData>('projectData');
+  // const projectData = liveblocksProjectData || { files: {}, folders: {} };
+
+  // Mutation to update projectData in Liveblocks
+  // const updateProjectData = useMutation(({ storage }, updater: (prev: ProjectData) => ProjectData) => {
+  //   const prev = storage.get('projectData');
+  //   storage.set('projectData', updater(prev || { files: {}, folders: {} }));
+  // }, []);
 
   // Helper to get user-specific key
   const getUserKey = (key: string) => {
@@ -58,9 +64,9 @@ function App() {
     const savedCurrentVersion = localStorage.getItem('current-version');
     const savedActiveFile = localStorage.getItem('active-file');
 
-    if (savedProjectData) {
-      setProjectData(JSON.parse(savedProjectData));
-    }
+    // if (savedProjectData) {
+    //   updateProjectData(JSON.parse(savedProjectData));
+    // }
     if (savedVersions) {
       setVersions(JSON.parse(savedVersions));
     }
@@ -101,26 +107,17 @@ function App() {
     const versionsStr = localStorage.getItem(getUserKey(`project-versions-${currentProjectId}`));
     const currentVersionStr = localStorage.getItem(getUserKey(`current-version-${currentProjectId}`));
     const activeFileStr = localStorage.getItem(getUserKey(`active-file-${currentProjectId}`));
-    if (projectDataStr) setProjectData(JSON.parse(projectDataStr));
+    // if (projectDataStr) updateProjectData(JSON.parse(projectDataStr));
     if (versionsStr) setVersions(JSON.parse(versionsStr));
     if (currentVersionStr) setCurrentVersion(currentVersionStr);
     if (activeFileStr) setActiveFile(activeFileStr);
     setShowProjectDashboard(false);
   }, [currentProjectId, user]);
 
-  // Save project data to localStorage with project id
-  const saveProjectDataForCurrent = useCallback(() => {
-    if (!user || !currentProjectId) return;
-    localStorage.setItem(getUserKey(`project-data-${currentProjectId}`), JSON.stringify(projectData));
-    localStorage.setItem(getUserKey(`project-versions-${currentProjectId}`), JSON.stringify(versions));
-    localStorage.setItem(getUserKey(`current-version-${currentProjectId}`), currentVersion);
-    localStorage.setItem(getUserKey(`active-file-${currentProjectId}`), activeFile || '');
-  }, [user, currentProjectId, projectData, versions, currentVersion, activeFile]);
-
   // Call saveProjectDataForCurrent when relevant data changes
-  useEffect(() => {
-    saveProjectDataForCurrent();
-  }, [saveProjectDataForCurrent]);
+  // useEffect(() => {
+  //   saveProjectDataForCurrent();
+  // }, [saveProjectDataForCurrent]);
 
   const createInitialVersion = useCallback(() => {
     const initialVersion: Version = {
@@ -136,9 +133,9 @@ function App() {
     localStorage.setItem('current-version', initialVersion.id);
   }, []);
 
-  const saveProjectData = useCallback(() => {
-    localStorage.setItem('project-data', JSON.stringify(projectData));
-  }, [projectData]);
+  // const saveProjectData = useCallback(() => {
+  //   localStorage.setItem('project-data', JSON.stringify(projectData));
+  // }, [projectData]);
 
   const createNewFile = useCallback((name: string, type: 'spreadsheet' | 'chart' | 'financial_model', parentFolder?: string) => {
     const fileId = generateId();
@@ -159,13 +156,13 @@ function App() {
       modifiedAt: Date.now()
     };
 
-    setProjectData(prev => ({
-      ...prev,
-      files: {
-        ...prev.files,
-        [fileId]: newFile
-      }
-    }));
+    // updateProjectData(prev => ({
+    //   ...prev,
+    //   files: {
+    //     ...prev.files,
+    //     [fileId]: newFile
+    //   }
+    // }));
 
     setActiveFile(fileId);
     setUnsavedChanges(true);
@@ -174,45 +171,45 @@ function App() {
 
   const createNewFolder = useCallback((name: string, parentFolder?: string) => {
     const folderId = generateId();
-    setProjectData(prev => ({
-      ...prev,
-      folders: {
-        ...prev.folders,
-        [folderId]: {
-          id: folderId,
-          name,
-          parentFolder,
-          createdAt: Date.now()
-        }
-      }
-    }));
+    // updateProjectData(prev => ({
+    //   ...prev,
+    //   folders: {
+    //     ...prev.folders,
+    //     [folderId]: {
+    //       id: folderId,
+    //       name,
+    //       parentFolder,
+    //       createdAt: Date.now()
+    //     }
+    //   }
+    // }));
     setUnsavedChanges(true);
   }, []);
 
   const updateFileData = useCallback((fileId: string, data: any) => {
-    setProjectData(prev => ({
-      ...prev,
-      files: {
-        ...prev.files,
-        [fileId]: {
-          ...prev.files[fileId],
-          data,
-          modifiedAt: Date.now()
-        }
-      }
-    }));
+    // updateProjectData(prev => ({
+    //   ...prev,
+    //   files: {
+    //     ...prev.files,
+    //     [fileId]: {
+    //       ...prev.files[fileId],
+    //       data,
+    //       modifiedAt: Date.now()
+    //     }
+    //   }
+    // }));
     setUnsavedChanges(true);
   }, []);
 
   const deleteFile = useCallback((fileId: string) => {
-    setProjectData(prev => {
-      const newFiles = { ...prev.files };
-      delete newFiles[fileId];
-      return {
-        ...prev,
-        files: newFiles
-      };
-    });
+    // updateProjectData(prev => {
+    //   const newFiles = { ...prev.files };
+    //   delete newFiles[fileId];
+    //   return {
+    //     ...prev,
+    //     files: newFiles
+    //   };
+    // });
     
     if (activeFile === fileId) {
       setActiveFile(null);
@@ -221,17 +218,17 @@ function App() {
   }, [activeFile]);
 
   const renameFile = useCallback((fileId: string, newName: string) => {
-    setProjectData(prev => ({
-      ...prev,
-      files: {
-        ...prev.files,
-        [fileId]: {
-          ...prev.files[fileId],
-          name: newName,
-          modifiedAt: Date.now()
-        }
-      }
-    }));
+    // updateProjectData(prev => ({
+    //   ...prev,
+    //   files: {
+    //     ...prev.files,
+    //     [fileId]: {
+    //       ...prev.files[fileId],
+    //       name: newName,
+    //       modifiedAt: Date.now()
+    //     }
+    //   }
+    // }));
     setUnsavedChanges(true);
   }, []);
 
@@ -243,7 +240,7 @@ function App() {
           id: generateId(),
           name,
           timestamp: Date.now(),
-          projectData: JSON.parse(JSON.stringify(projectData)),
+          projectData: JSON.parse(JSON.stringify({ files: {}, folders: {} })),
           description: description || ''
         };
         const updatedVersions = [...versions, newVersion];
@@ -252,29 +249,28 @@ function App() {
         setUnsavedChanges(false);
         localStorage.setItem('project-versions', JSON.stringify(updatedVersions));
         localStorage.setItem('current-version', newVersion.id);
-        saveProjectData();
       },
       initial: `Checkpoint ${versions.length + 1}`,
       extraLabel: 'Description (optional)'
     });
-  }, [projectData, versions, saveProjectData]);
+  }, [versions, setVersions, setCurrentVersion, setUnsavedChanges]);
 
   const restoreVersion = useCallback((versionId: string) => {
     const version = versions.find(v => v.id === versionId);
     if (version) {
-      setProjectData(version.projectData);
+      // updateProjectData(version.projectData);
       setCurrentVersion(versionId);
       setUnsavedChanges(false);
       setShowHistory(false);
       localStorage.setItem('project-data', JSON.stringify(version.projectData));
       localStorage.setItem('current-version', versionId);
     }
-  }, [versions]);
+  }, [versions, setCurrentVersion, setUnsavedChanges, setShowHistory]);
 
   const exportProject = useCallback(async () => {
     const zip = new JSZip();
     // Export all spreadsheets as CSV
-    Object.values(projectData.files).forEach(file => {
+    Object.values({ files: {}, folders: {} }).forEach(file => {
       if (file.type === 'spreadsheet') {
         const csv = spreadsheetDataToCSV(file.data as SpreadsheetData);
         zip.file(`${file.name || 'Sheet'}.csv`, csv);
@@ -283,7 +279,7 @@ function App() {
     // Export all charts as images
     const chartNodes = document.querySelectorAll('.recharts-wrapper');
     let chartIndex = 0;
-    for (const file of Object.values(projectData.files)) {
+    for (const file of Object.values({ files: {}, folders: {} })) {
       if (file.type === 'chart') {
         const chartNode = chartNodes[chartIndex];
         if (chartNode) {
@@ -304,7 +300,7 @@ function App() {
     a.download = `${projects.find(p => p.id === currentProjectId)?.name || 'project'}-export.zip`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [projectData, projects, currentProjectId]);
+  }, [projects, currentProjectId]);
 
   // CSV import logic
   const importCSV = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -341,7 +337,7 @@ function App() {
         try {
           const importedData = JSON.parse(e.target?.result as string);
           if (importedData.projectData && importedData.versions) {
-            setProjectData(importedData.projectData);
+            // updateProjectData(importedData.projectData);
             setVersions(importedData.versions);
             setCurrentVersion(importedData.currentVersion);
             setUnsavedChanges(false);
@@ -369,13 +365,13 @@ function App() {
   }, []);
 
   const getActiveFileData = useCallback(() => {
-    if (!activeFile || !projectData.files[activeFile]) return null;
-    return projectData.files[activeFile];
-  }, [activeFile, projectData.files]);
+    if (!activeFile || !({ files: {}, folders: {} })[activeFile]) return null;
+    return ({ files: {}, folders: {} })[activeFile];
+  }, [activeFile]);
 
   const getAllSpreadsheetFiles = useCallback(() => {
-    return Object.values(projectData.files).filter(file => file.type === 'spreadsheet');
-  }, [projectData.files]);
+    return Object.values({ files: {}, folders: {} }).filter(file => file.type === 'spreadsheet');
+  }, []);
 
   useEffect(() => {
     if (activeFile) {
@@ -405,7 +401,7 @@ function App() {
     setCurrentProjectId(id);
     // Use primaryEmailAddress if available, otherwise fallback to user.id
     const ownerId = user.primaryEmailAddress?.emailAddress || user.id;
-    setProjectData({ files: {}, folders: {}, owner: ownerId, sharedWith: [] });
+    // updateProjectData({ files: {}, folders: {}, owner: ownerId, sharedWith: [] });
     setVersions([]);
     setCurrentVersion('');
     setActiveFile(null);
@@ -415,23 +411,23 @@ function App() {
   // Add a function to share the project
   const shareProject = useCallback((email: string) => {
     if (!user || !currentProjectId) return;
-    setProjectData(prev => {
-      const sharedWith = prev.sharedWith ? [...prev.sharedWith] : [];
-      if (!sharedWith.includes(email)) {
-        sharedWith.push(email);
-      }
-      return { ...prev, sharedWith };
-    });
+    // updateProjectData(prev => {
+    //   const sharedWith = prev.sharedWith ? [...prev.sharedWith] : [];
+    //   if (!sharedWith.includes(email)) {
+    //     sharedWith.push(email);
+    //   }
+    //   return { ...prev, sharedWith };
+    // });
   }, [user, currentProjectId]);
 
   // Add a function to check if user has access
   const userHasAccess = useCallback(() => {
     if (!user || !currentProjectId) return false;
     const userIdOrEmail = user.primaryEmailAddress?.emailAddress || user.id;
-    if (projectData.owner === userIdOrEmail) return true;
-    if (projectData.sharedWith && projectData.sharedWith.includes(userIdOrEmail)) return true;
+    // if (projectData.owner === userIdOrEmail) return true;
+    // if (projectData.sharedWith && projectData.sharedWith.includes(userIdOrEmail)) return true;
     return false;
-  }, [user, currentProjectId, projectData]);
+  }, [user, currentProjectId]);
 
   // On mount, check if URL is /projects/:id and set currentProjectId
   useEffect(() => {
@@ -465,83 +461,43 @@ function App() {
           <Dashboard
             projects={projects}
             currentProjectId={currentProjectId}
-            projectData={projectData}
+            projectData={{ files: {}, folders: {} }}
             onCreateProject={createNewProject}
             onOpenProject={handleOpenProject}
             onShowModal={(type, onSubmit) => setModal({ type, onSubmit })}
             onExportFile={(filename) => {
-              // Handle file export - you can implement this based on your export logic
               console.log(`Exporting file: ${filename}`);
             }}
           />
         ) : (
-          <RoomProvider id={currentProjectId} initialPresence={{ user: user?.primaryEmailAddress?.emailAddress || user?.id }}>
-            <div className="min-h-screen bg-gray-50 flex">
-              {/* Sidebar */}
-              <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-                <FileActionBar
-                  projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
-                  onNewSheet={() => setModal({ type: 'sheet', onSubmit: (name) => createNewFile(name, 'spreadsheet') })}
-                  onNewChart={() => setModal({ type: 'chart', onSubmit: (name) => createNewFile(name, 'chart') })}
-                  onNewFinancialModel={() => setModal({ type: 'financial_model', onSubmit: (name) => createNewFile(name, 'financial_model') })}
-                />
-                <Sidebar
-                  projectData={projectData}
-                  activeFile={activeFile}
-                  onFileSelect={setActiveFile}
-                  onFileDelete={deleteFile}
-                  onFileRename={(fileId, currentName) => setModal({ type: 'rename', onSubmit: (name) => renameFile(fileId, name), initial: currentName })}
-                  onCreateFolder={createNewFolder}
-                />
-              </div>
-              {/* Main Content */}
-              <div className="flex-1 flex flex-col">
-                <HeaderBar
-                  projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
-                  fileName={activeFileData?.name || ''}
-                  fileType={activeFileData?.type === 'spreadsheet' ? 'Spreadsheet' : 'Chart'}
-                  versionName={getCurrentVersionName()}
-                  unsavedChanges={unsavedChanges}
-                  onBack={() => setShowProjectDashboard(true)}
-                  onSave={createCheckpoint}
-                  onShowHistory={() => setShowHistory(!showHistory)}
-                  onExport={exportProject}
-                  onImport={importCSV}
-                  showHistory={showHistory}
-                  onShare={handleShare}
-                  shareLink={shareLink || undefined}
-                />
-                <main className="flex-1 flex">
-                  <div className={`flex-1 ${showHistory || showDiff ? 'lg:w-2/3' : 'w-full'}`}>
-                    <MainContent
-                      activeFileData={activeFileData}
-                      updateFileData={updateFileData}
-                      getAllSpreadsheetFiles={getAllSpreadsheetFiles}
-                      projectData={projectData}
-                      createNewFile={createNewFile}
-                      showDiff={showDiff}
-                    />
-                  </div>
-                  {showHistory && (
-                    <HistoryPanel
-                      versions={versions}
-                      currentVersion={currentVersion}
-                      onRestore={restoreVersion}
-                      onShowDiff={showDiffView}
-                      onClose={() => setShowHistory(false)}
-                    />
-                  )}
-                  {showDiff && (
-                    <DiffPanel
-                      projectData={projectData}
-                      versions={versions}
-                      compareVersion={compareVersion}
-                      onClose={() => setShowDiff(false)}
-                    />
-                  )}
-                </main>
-              </div>
-            </div>
+          <RoomProvider
+            id={currentProjectId}
+            initialStorage={{ project: new LiveObject({ files: {}, folders: {} }) }}
+          >
+            <ProjectRoom
+              currentProjectId={currentProjectId}
+              user={user}
+              projects={projects}
+              setShowProjectDashboard={setShowProjectDashboard}
+              createCheckpoint={createCheckpoint}
+              getCurrentVersionName={getCurrentVersionName}
+              unsavedChanges={unsavedChanges}
+              showHistory={showHistory}
+              setShowHistory={setShowHistory}
+              showDiff={showDiff}
+              setShowDiff={setShowDiff}
+              versions={versions}
+              currentVersion={currentVersion}
+              restoreVersion={restoreVersion}
+              showDiffView={showDiffView}
+              compareVersion={compareVersion}
+              setCompareVersion={setCompareVersion}
+              shareLink={shareLink || undefined}
+              handleShare={handleShare}
+              setModal={setModal}
+              setModalInput={setModalInput}
+              setModalExtra={setModalExtra}
+            />
           </RoomProvider>
         )}
       </SignedIn>
@@ -604,6 +560,281 @@ function App() {
         )}
       </Modal>
     </>
+  );
+}
+
+function ProjectRoom({
+  currentProjectId,
+  user,
+  projects,
+  setShowProjectDashboard,
+  createCheckpoint,
+  getCurrentVersionName,
+  unsavedChanges,
+  showHistory,
+  setShowHistory,
+  showDiff,
+  setShowDiff,
+  versions,
+  currentVersion,
+  restoreVersion,
+  showDiffView,
+  compareVersion,
+  setCompareVersion,
+  shareLink,
+  handleShare,
+  setModal,
+  setModalInput,
+  setModalExtra
+}: {
+  currentProjectId: string;
+  user: any;
+  projects: {id: string, name: string}[];
+  setShowProjectDashboard: (b: boolean) => void;
+  createCheckpoint: () => void;
+  getCurrentVersionName: () => string;
+  unsavedChanges: boolean;
+  showHistory: boolean;
+  setShowHistory: (b: boolean) => void;
+  showDiff: boolean;
+  setShowDiff: (b: boolean) => void;
+  versions: any[];
+  currentVersion: string;
+  restoreVersion: (id: string) => void;
+  showDiffView: (id: string) => void;
+  compareVersion: string;
+  setCompareVersion: (id: string) => void;
+  shareLink: string | undefined;
+  handleShare: () => void;
+  setModal: any;
+  setModalInput: any;
+  setModalExtra: any;
+}) {
+  // Liveblocks storage for project data
+  const liveblocksProject = useStorage((root: any) => root["project"]);
+  const setLiveblocksProject = useMutation(({ storage }, newProjectData: ProjectData) => {
+    storage.set("project", new LiveObject(newProjectData));
+  }, []);
+
+  // All project data reads/writes go through Liveblocks
+  const effectiveProjectData = liveblocksProject || { files: {}, folders: {} };
+
+  // File operations
+  const wrappedUpdateFileData = (fileId: any, data: any) => {
+    setLiveblocksProject({
+      ...effectiveProjectData,
+      files: {
+        ...effectiveProjectData.files,
+        [fileId]: {
+          ...effectiveProjectData.files[fileId],
+          data,
+          modifiedAt: Date.now()
+        }
+      }
+    });
+  };
+  const wrappedCreateNewFile = (name: any, type: any, parentFolder?: any) => {
+    const fileId = generateId();
+    const newFile = {
+      id: fileId,
+      name,
+      type,
+      data: type === 'spreadsheet' ? {} : {
+        type: 'bar',
+        title: '',
+        xAxis: { label: '', data: [] },
+        yAxis: { label: '', data: [] },
+        sourceFile: '',
+        sourceColumns: { x: '', y: '' }
+      },
+      parentFolder,
+      createdAt: Date.now(),
+      modifiedAt: Date.now()
+    };
+    setLiveblocksProject({
+      ...effectiveProjectData,
+      files: {
+        ...effectiveProjectData.files,
+        [fileId]: newFile
+      }
+    });
+    return fileId;
+  };
+  const wrappedCreateNewFolder = (name: any, parentFolder?: any) => {
+    const folderId = generateId();
+    setLiveblocksProject({
+      ...effectiveProjectData,
+      folders: {
+        ...effectiveProjectData.folders,
+        [folderId]: {
+          id: folderId,
+          name,
+          parentFolder,
+          createdAt: Date.now()
+        }
+      }
+    });
+  };
+  const wrappedDeleteFile = (fileId: any) => {
+    const newFiles = { ...effectiveProjectData.files };
+    delete newFiles[fileId];
+    setLiveblocksProject({
+      ...effectiveProjectData,
+      files: newFiles
+    });
+  };
+  const wrappedRenameFile = (fileId: any, newName: any) => {
+    setLiveblocksProject({
+      ...effectiveProjectData,
+      files: {
+        ...effectiveProjectData.files,
+        [fileId]: {
+          ...effectiveProjectData.files[fileId],
+          name: newName,
+          modifiedAt: Date.now()
+        }
+      }
+    });
+  };
+
+  // Spreadsheet utilities
+  const getAllSpreadsheetFiles = () => {
+    return Object.values(effectiveProjectData.files).filter((file: any) => file.type === 'spreadsheet');
+  };
+  const getActiveFileData = (activeFile: string | null) => {
+    if (!activeFile || !effectiveProjectData.files[activeFile]) return null;
+    return effectiveProjectData.files[activeFile];
+  };
+
+  // Export project logic
+  const exportProject = useCallback(async () => {
+    const zip = new JSZip();
+    // Export all spreadsheets as CSV
+    Object.values(effectiveProjectData.files).forEach((file: any) => {
+      if (file.type === 'spreadsheet') {
+        const csv = spreadsheetDataToCSV(file.data as SpreadsheetData);
+        zip.file(`${file.name || 'Sheet'}.csv`, csv);
+      }
+    });
+    // Export all charts as images
+    const chartNodes = document.querySelectorAll('.recharts-wrapper');
+    let chartIndex = 0;
+    for (const file of Object.values(effectiveProjectData.files)) {
+      if ((file as any).type === 'chart') {
+        const chartNode = chartNodes[chartIndex];
+        if (chartNode) {
+          const canvas = await html2canvas(chartNode as HTMLElement);
+          const dataUrl = canvas.toDataURL('image/png');
+          zip.file(`${(file as any).name || 'Chart'}.png`, dataUrl.split(',')[1], {base64: true});
+        }
+        chartIndex++;
+      }
+    }
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projects.find(p => p.id === currentProjectId)?.name || 'project'}-export.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [effectiveProjectData, projects, currentProjectId]);
+
+  // CSV import logic
+  const importCSV = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.name.endsWith('.csv')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        const rows = text.split(/\r?\n/).map(row => row.split(','));
+        const data: any = {};
+        for (let r = 0; r < rows.length; r++) {
+          for (let c = 0; c < rows[r].length; c++) {
+            const value = rows[r][c].replace(/^"|"$/g, '').replace(/""/g, '"');
+            data[`${r}-${c}`] = { value, formula: null };
+          }
+        }
+        const name = file.name.replace(/\.csv$/, '');
+        const newFileId = wrappedCreateNewFile(name, 'spreadsheet');
+        setTimeout(() => {
+          wrappedUpdateFileData(newFileId, data);
+        }, 100);
+      };
+      reader.readAsText(file);
+    }
+  }, [wrappedCreateNewFile, wrappedUpdateFileData]);
+
+  // Compute activeFile state locally for this room
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const activeFileData = getActiveFileData(activeFile);
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar */}
+      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <FileActionBar
+          projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
+          onNewSheet={() => setModal({ type: 'sheet', onSubmit: (name: string) => wrappedCreateNewFile(name, 'spreadsheet') })}
+          onNewChart={() => setModal({ type: 'chart', onSubmit: (name: string) => wrappedCreateNewFile(name, 'chart') })}
+          onNewFinancialModel={() => setModal({ type: 'financial_model', onSubmit: (name: string) => wrappedCreateNewFile(name, 'financial_model') })}
+        />
+        <Sidebar
+          projectData={effectiveProjectData}
+          activeFile={activeFile}
+          onFileSelect={setActiveFile}
+          onFileDelete={wrappedDeleteFile}
+          onFileRename={(fileId, currentName) => setModal({ type: 'rename', onSubmit: (name: string) => wrappedRenameFile(fileId, name), initial: currentName })}
+          onCreateFolder={wrappedCreateNewFolder}
+        />
+      </div>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        <HeaderBar
+          projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
+          fileName={activeFileData?.name || ''}
+          fileType={activeFileData?.type === 'spreadsheet' ? 'Spreadsheet' : 'Chart'}
+          versionName={getCurrentVersionName()}
+          unsavedChanges={unsavedChanges}
+          onBack={() => setShowProjectDashboard(true)}
+          onSave={createCheckpoint}
+          onShowHistory={() => setShowHistory(!showHistory)}
+          onExport={exportProject}
+          onImport={importCSV}
+          showHistory={showHistory}
+          onShare={handleShare}
+          shareLink={shareLink || undefined}
+        />
+        <main className="flex-1 flex">
+          <div className={`flex-1 ${showHistory || showDiff ? 'lg:w-2/3' : 'w-full'}`}>
+            <MainContent
+              activeFileData={activeFileData}
+              updateFileData={wrappedUpdateFileData}
+              getAllSpreadsheetFiles={getAllSpreadsheetFiles}
+              projectData={effectiveProjectData}
+              createNewFile={wrappedCreateNewFile}
+              showDiff={showDiff}
+            />
+          </div>
+          {showHistory && (
+            <HistoryPanel
+              versions={versions}
+              currentVersion={currentVersion}
+              onRestore={restoreVersion}
+              onShowDiff={showDiffView}
+              onClose={() => setShowHistory(false)}
+            />
+          )}
+          {showDiff && (
+            <DiffPanel
+              projectData={effectiveProjectData}
+              versions={versions}
+              compareVersion={compareVersion}
+              onClose={() => setShowDiff(false)}
+            />
+          )}
+        </main>
+      </div>
+    </div>
   );
 }
 

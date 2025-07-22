@@ -47,6 +47,7 @@ export interface ProjectData {
   folders: { [key: string]: FolderItem };
   owner?: string; // user id or email of the creator
   sharedWith?: string[]; // array of user ids or emails with access
+  [key: string]: any; // index signature for Liveblocks compatibility
 }
 
 export interface Version {
