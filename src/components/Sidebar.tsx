@@ -85,16 +85,16 @@ const Sidebar: React.FC<SidebarProps> = ({
     return (
       <div key={folder.id}>
         <div
-          className={`flex items-center space-x-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded-md`}
+          className={`flex items-center space-x-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-800 rounded-md`}
           style={{ paddingLeft: `${12 + level * 16}px` }}
           onClick={() => toggleFolder(folder.id)}
         >
           {isExpanded ? (
-            <FolderOpen className="h-4 w-4 text-green-600" />
+            <FolderOpen className="h-4 w-4 text-green-400" />
           ) : (
-            <Folder className="h-4 w-4 text-green-600" />
+            <Folder className="h-4 w-4 text-green-400" />
           )}
-          <span className="flex-1 truncate text-gray-900">{folder.name}</span>
+          <span className="flex-1 truncate text-gray-200">{folder.name}</span>
         </div>
 
         {isExpanded && (
@@ -113,8 +113,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     return (
       <div
         key={file.id}
-        className={`flex items-center space-x-2 px-3 py-2 text-sm cursor-pointer rounded-md ${
-          isActive ? 'bg-blue-100 text-blue-900' : 'text-gray-700 hover:bg-gray-100'
+        className={`flex items-center space-x-2 px-3 py-2 text-sm cursor-pointer rounded-md group ${
+          isActive ? 'bg-green-600 text-white' : 'text-gray-300 hover:bg-gray-800'
         }`}
         style={{ paddingLeft: `${12 + level * 16}px` }}
         onClick={() => onFileSelect(file.id)}
@@ -127,7 +127,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             e.stopPropagation();
             handleContextMenu(e, file.id);
           }}
-          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded"
+          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700 rounded"
         >
           <MoreVertical className="h-3 w-3" />
         </button>
@@ -147,8 +147,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {Object.keys(projectData.files).length === 0 && Object.keys(projectData.folders).length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          <Folder className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+        <div className="text-center py-8 text-gray-400">
+          <Folder className="h-8 w-8 mx-auto mb-2 text-gray-500" />
           <p className="text-sm">No files yet</p>
           <p className="text-xs">Create your first file to get started</p>
         </div>

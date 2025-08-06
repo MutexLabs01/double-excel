@@ -65,7 +65,7 @@ const TypewriterEffect: React.FC<TypewriterEffectProps> = ({
 
   return (
     <div className={`inline-block ${className}`}>
-      <span className="font-mono font-bold tracking-wider text-gray-900">
+      <span className="font-mono font-bold tracking-wider">
         {displayText}
       </span>
       <span 

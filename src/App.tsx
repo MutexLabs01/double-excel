@@ -33,6 +33,9 @@ function App() {
   //   storage.set('projectData', updater(prev || { files: {}, folders: {} }));
   // }, []);
 
+  // Theme state
+  const [darkTheme, setDarkTheme] = useState(true);
+
   // Helper to get user-specific key
   const getUserKey = (key: string) => {
     return user ? `${user.id}:${key}` : key;
@@ -502,7 +505,7 @@ function App() {
         )}
       </SignedIn>
       <SignedOut>
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="min-h-screen flex items-center justify-center bg-black">
           <SignIn routing="hash" />
         </div>
       </SignedOut>
@@ -786,9 +789,9 @@ function ProjectRoom({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-black flex">
       {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      <div className="w-64 bg-gray-900 border-r border-gray-700 flex flex-col">
         <FileActionBar
           projectName={projects.find(p => p.id === currentProjectId)?.name || 'Double Excel'}
           onNewSheet={() => setModal({ type: 'sheet', onSubmit: (name: string) => wrappedCreateNewFile(name, 'spreadsheet') })}
