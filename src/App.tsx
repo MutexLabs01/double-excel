@@ -577,7 +577,7 @@ function ProjectRoom({
   setShowDiff,
   versions,
   currentVersion,
-  restoreVersion,
+  restoreVersion: mainRestoreVersion,
   showDiffView,
   compareVersion,
   setCompareVersion,
@@ -621,6 +621,43 @@ function ProjectRoom({
 
   // All project data reads/writes go through Liveblocks
   const effectiveProjectData = liveblocksProject || { files: {}, folders: {} };
+
+  // Compute activeFile state locally for this room
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  
+  // Helper function to get active file data
+  const getActiveFileData = (activeFile: string | null) => {
+    if (!activeFile || !effectiveProjectData.files[activeFile]) return null;
+    return effectiveProjectData.files[activeFile];
+  };
+  
+  const activeFileData = getActiveFileData(activeFile);
+
+  // Create a local restoreVersion function that works with Liveblocks
+  const localRestoreVersion = useCallback((versionId: string) => {
+    const version = versions.find(v => v.id === versionId);
+    if (version && canMutate) {
+      // Update Liveblocks storage with the restored version data
+      setLiveblocksProject(version.projectData);
+      
+      // Handle activeFile state - if current activeFile doesn't exist in restored data, set to first available file
+      const restoredFiles = Object.values(version.projectData.files);
+      if (restoredFiles.length > 0) {
+        if (!activeFile || !version.projectData.files[activeFile]) {
+          // Set activeFile to the first available file in the restored version
+          const firstFile = restoredFiles[0] as any;
+          setActiveFile(firstFile.id);
+        }
+        // If activeFile exists in restored data, keep it
+      } else {
+        // No files in restored version, clear activeFile
+        setActiveFile(null);
+      }
+      
+      // Also call the main restoreVersion to update localStorage and other state
+      mainRestoreVersion(versionId);
+    }
+  }, [versions, canMutate, setLiveblocksProject, mainRestoreVersion, activeFile, setActiveFile]);
 
   // File operations with guards
   const wrappedUpdateFileData = (fileId: any, data: any) => {
@@ -706,12 +743,8 @@ function ProjectRoom({
   };
 
   // Spreadsheet utilities
-  const getAllSpreadsheetFiles = () => {
-    return Object.values(effectiveProjectData.files).filter((file: any) => file.type === 'spreadsheet');
-  };
-  const getActiveFileData = (activeFile: string | null) => {
-    if (!activeFile || !effectiveProjectData.files[activeFile]) return null;
-    return effectiveProjectData.files[activeFile];
+  const getAllSpreadsheetFiles = (): FileItem[] => {
+    return Object.values(effectiveProjectData.files).filter((file: any) => file.type === 'spreadsheet') as FileItem[];
   };
 
   // Export project logic
@@ -772,10 +805,6 @@ function ProjectRoom({
     }
   }, [wrappedCreateNewFile, wrappedUpdateFileData, canMutate]);
 
-  // Compute activeFile state locally for this room
-  const [activeFile, setActiveFile] = useState<string | null>(null);
-  const activeFileData = getActiveFileData(activeFile);
-
   // Show loading spinner/message if storage is not loaded
   if (!canMutate) {
     return (
@@ -794,15 +823,14 @@ function ProjectRoom({
           onNewSheet={() => setModal({ type: 'sheet', onSubmit: (name: string) => wrappedCreateNewFile(name, 'spreadsheet') })}
           onNewChart={() => setModal({ type: 'chart', onSubmit: (name: string) => wrappedCreateNewFile(name, 'chart') })}
           onNewFinancialModel={() => setModal({ type: 'financial_model', onSubmit: (name: string) => wrappedCreateNewFile(name, 'financial_model') })}
-          disabled={!canMutate}
         />
         <Sidebar
           projectData={effectiveProjectData}
           activeFile={activeFile}
-          onFileSelect={canMutate ? setActiveFile : undefined}
-          onFileDelete={canMutate ? wrappedDeleteFile : undefined}
-          onFileRename={canMutate ? (fileId, currentName) => setModal({ type: 'rename', onSubmit: (name: string) => wrappedRenameFile(fileId, name), initial: currentName }) : undefined}
-          onCreateFolder={canMutate ? wrappedCreateNewFolder : undefined}
+          onFileSelect={setActiveFile}
+          onFileDelete={wrappedDeleteFile}
+          onFileRename={(fileId, currentName) => setModal({ type: 'rename', onSubmit: (name: string) => wrappedRenameFile(fileId, name), initial: currentName })}
+          onCreateFolder={wrappedCreateNewFolder}
         />
       </div>
       {/* Main Content */}
@@ -837,7 +865,7 @@ function ProjectRoom({
             <HistoryPanel
               versions={versions}
               currentVersion={currentVersion}
-              onRestore={restoreVersion}
+              onRestore={localRestoreVersion}
               onShowDiff={showDiffView}
               onClose={() => setShowHistory(false)}
             />
