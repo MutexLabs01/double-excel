@@ -18,6 +18,7 @@ import MainContent from './components/MainContent';
 import HistoryPanel from './components/HistoryPanel';
 import DiffPanel from './components/DiffPanel';
 import FinancialModeling from './components/FinancialModeling';
+import MLPanel from './components/MLPanel';
 import { RoomProvider, useStorage, useMutation } from '@liveblocks/react';
 import { LiveObject } from '@liveblocks/client';
 
@@ -56,6 +57,9 @@ function App() {
   const [modalInput, setModalInput] = useState('');
   const [modalExtra, setModalExtra] = useState('');
   const [shareLink, setShareLink] = useState<string | null>(null);
+  
+  // Add ML state
+  const [showML, setShowML] = useState(false);
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -453,6 +457,14 @@ function App() {
     }
   }, [currentProjectId, shareProject]);
 
+  const handleShowML = useCallback(() => {
+    setShowML(true);
+  }, []);
+
+  const handleCloseML = useCallback(() => {
+    setShowML(false);
+  }, []);
+
   // In the dashboard UI, show project list and create button
   return (
     <>
@@ -497,6 +509,9 @@ function App() {
               setModal={setModal}
               setModalInput={setModalInput}
               setModalExtra={setModalExtra}
+              handleShowML={handleShowML}
+              handleCloseML={handleCloseML}
+              showML={showML}
             />
           </RoomProvider>
         )}
@@ -585,7 +600,10 @@ function ProjectRoom({
   handleShare,
   setModal,
   setModalInput,
-  setModalExtra
+  setModalExtra,
+  handleShowML,
+  handleCloseML,
+  showML
 }: {
   currentProjectId: string;
   user: any;
@@ -609,6 +627,9 @@ function ProjectRoom({
   setModal: any;
   setModalInput: any;
   setModalExtra: any;
+  handleShowML: () => void;
+  handleCloseML: () => void;
+  showML: boolean;
 }) {
   // Liveblocks storage for project data
   const liveblocksProject = useStorage((root: any) => root["project"]);
@@ -849,6 +870,7 @@ function ProjectRoom({
           showHistory={showHistory}
           onShare={handleShare}
           shareLink={shareLink || undefined}
+          onShowML={handleShowML}
         />
         <main className="flex-1 flex">
           <div className={`flex-1 ${showHistory || showDiff ? 'lg:w-2/3' : 'w-full'}`}>
@@ -880,6 +902,14 @@ function ProjectRoom({
           )}
         </main>
       </div>
+      
+      {/* ML Panel */}
+      {showML && (
+        <MLPanel
+          projectData={effectiveProjectData}
+          onClose={handleCloseML}
+        />
+      )}
     </div>
   );
 }

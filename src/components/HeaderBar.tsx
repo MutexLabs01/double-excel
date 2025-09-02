@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserButton } from '@clerk/clerk-react';
-import { Save, History, Download, Upload } from 'lucide-react';
+import { Save, History, Download, Upload, Brain } from 'lucide-react';
 
 interface HeaderBarProps {
   projectName: string;
@@ -16,6 +16,7 @@ interface HeaderBarProps {
   showHistory: boolean;
   onShare?: () => void;
   shareLink?: string;
+  onShowML?: () => void;
 }
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -31,7 +32,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   onImport,
   showHistory,
   onShare,
-  shareLink
+  shareLink,
+  onShowML
 }) => (
   <header className="bg-white shadow-sm border-b">
     <div className="px-6">
@@ -53,6 +55,15 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
         </div>
         <div className="flex items-center space-x-2">
           <UserButton />
+          {onShowML && (
+            <button
+              onClick={onShowML}
+              className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+            >
+              <Brain className="h-4 w-4 mr-1" />
+              ML
+            </button>
+          )}
           <button
             onClick={onSave}
             className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
