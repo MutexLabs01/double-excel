@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Brain, BarChart3, Settings, Eye, Target, Play, Download, ArrowRight, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Brain, BarChart3, Settings, Eye, Target, Play, Download, FileSpreadsheet, Database, Zap, TrendingUp } from 'lucide-react';
 import { MLState, MLColumn, MLModel, MLFormData, MLMetrics } from '../types/ml';
 import { MLService } from '../utils/ml';
 import { SpreadsheetData } from '../types/spreadsheet';
@@ -57,6 +57,9 @@ const MLPanel: React.FC<MLPanelProps> = ({ projectData, onClose }) => {
   const [availableSheets, setAvailableSheets] = useState<FileItem[]>([]);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   const [selectedSheetData, setSelectedSheetData] = useState<SpreadsheetData | null>(null);
+  const [predictionSheetId, setPredictionSheetId] = useState<string>('');
+  const [predictionColumns, setPredictionColumns] = useState<string[]>([]);
+  const [predictionSheetData, setPredictionSheetData] = useState<SpreadsheetData | null>(null);
 
   useEffect(() => {
     // Get available sheets
@@ -131,17 +134,62 @@ const MLPanel: React.FC<MLPanelProps> = ({ projectData, onClose }) => {
     }
   }, [formData.sheetId, projectData]);
 
-  const handleNext = () => {
-    if (mlState.currentStep < 3) {
-      setMlState(prev => ({ ...prev, currentStep: prev.currentStep + 1 }));
+  useEffect(() => {
+    if (predictionSheetId && projectData.files[predictionSheetId]) {
+      const sheetData = projectData.files[predictionSheetId].data;
+      setPredictionSheetData(sheetData);
+      
+      // Extract columns for prediction sheet
+      const columns = new Set<string>();
+      let maxCol = 0;
+      
+      Object.keys(sheetData).forEach(cellKey => {
+        const parts = cellKey.split('-');
+        if (parts.length === 2) {
+          const colIndex = parseInt(parts[1]);
+          if (!isNaN(colIndex) && colIndex > maxCol) {
+            maxCol = colIndex;
+          }
+        }
+      });
+      
+      let hasHeaders = false;
+      for (let col = 0; col <= maxCol; col++) {
+        const cellKey = `0-${col}`;
+        const cellData = sheetData[cellKey];
+        if (cellData && cellData.value && cellData.value.trim() !== '') {
+          columns.add(cellData.value.trim());
+          hasHeaders = true;
+        }
+      }
+      
+      if (!hasHeaders) {
+        for (let col = 0; col <= maxCol; col++) {
+          let colName = '';
+          let tempCol = col;
+          while (tempCol >= 0) {
+            colName = String.fromCharCode(65 + (tempCol % 26)) + colName;
+            tempCol = Math.floor(tempCol / 26) - 1;
+          }
+          columns.add(colName);
+        }
+      }
+      
+      const sortedColumns = Array.from(columns).sort((a, b) => {
+        if (hasHeaders) {
+          return a.localeCompare(b);
+        }
+        if (a.length === 1 && b.length === 1) {
+          return a.localeCompare(b);
+        }
+        return a.length - b.length;
+      });
+      
+      setPredictionColumns(sortedColumns);
     }
-  };
+  }, [predictionSheetId, projectData]);
 
-  const handlePrevious = () => {
-    if (mlState.currentStep > 0) {
-      setMlState(prev => ({ ...prev, currentStep: prev.currentStep - 1 }));
-    }
-  };
+
 
   const handleTrain = async () => {
     if (!selectedSheetData || !formData.featureColumns.length || !formData.labelColumn || !formData.modelType) {
@@ -185,7 +233,7 @@ const MLPanel: React.FC<MLPanelProps> = ({ projectData, onClose }) => {
   };
 
   const handlePredict = async () => {
-    if (!selectedSheetData || !formData.featureColumns.length || !mlState.modelPath) {
+    if (!predictionSheetData || !formData.featureColumns.length || !mlState.modelPath) {
       return;
     }
 
@@ -193,7 +241,7 @@ const MLPanel: React.FC<MLPanelProps> = ({ projectData, onClose }) => {
 
     try {
       const X_new = MLService.preparePredictionData(
-        selectedSheetData,
+        predictionSheetData,
         formData.featureColumns
       );
 
@@ -219,375 +267,394 @@ const MLPanel: React.FC<MLPanelProps> = ({ projectData, onClose }) => {
     }
   };
 
-  const steps = [
-    { title: 'Select Data', description: 'Choose sheet and columns' },
-    { title: 'Configure Model', description: 'Select model type and parameters' },
-    { title: 'Train Model', description: 'Train and evaluate the model' },
-    { title: 'Results & Predict', description: 'View metrics and make predictions' }
-  ];
+  const renderDataSelectionSection = () => (
+    <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="flex items-center space-x-2 mb-4">
+        <Database className="h-5 w-5 text-gray-600" />
+        <h3 className="text-lg font-medium text-gray-900">Data Selection</h3>
+      </div>
+      
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Training Spreadsheet
+          </label>
+          <select
+            value={formData.sheetId}
+            onChange={(e) => setFormData(prev => ({ ...prev, sheetId: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+          >
+            <option value="">Choose a spreadsheet...</option>
+            {availableSheets.map(sheet => (
+              <option key={sheet.id} value={sheet.id}>{sheet.name}</option>
+            ))}
+          </select>
+        </div>
 
-  const renderStepContent = () => {
-    switch (mlState.currentStep) {
-      case 0:
-        return (
-          <div className="space-y-6">
+        {formData.sheetId && availableColumns.length > 0 && (
+          <>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Spreadsheet
+                Feature Columns
               </label>
               <select
-                value={formData.sheetId}
-                onChange={(e) => setFormData(prev => ({ ...prev, sheetId: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                multiple
+                value={formData.featureColumns}
+                onChange={(e) => {
+                  const selected = Array.from(e.target.selectedOptions, option => option.value);
+                  setFormData(prev => ({ ...prev, featureColumns: selected }));
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 min-h-[80px]"
               >
-                <option value="">Choose a spreadsheet...</option>
-                {availableSheets.map(sheet => (
-                  <option key={sheet.id} value={sheet.id}>{sheet.name}</option>
+                {availableColumns.map(col => (
+                  <option key={col} value={col}>{col}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Label Column
+              </label>
+              <select
+                value={formData.labelColumn}
+                onChange={(e) => setFormData(prev => ({ ...prev, labelColumn: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                <option value="">Choose label column...</option>
+                {availableColumns.map(col => (
+                  <option key={col} value={col}>{col}</option>
                 ))}
               </select>
             </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 
-            {formData.sheetId && (
-              <>
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-2">
-                    <strong>Available columns:</strong> {availableColumns.length > 0 ? availableColumns.join(', ') : 'No columns found'}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Total columns detected: {availableColumns.length}
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Feature Columns (Select multiple)
-                  </label>
-                  {availableColumns.length > 0 ? (
-                    <select
-                      multiple
-                      value={formData.featureColumns}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions, option => option.value);
-                        setFormData(prev => ({ ...prev, featureColumns: selected }));
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[100px]"
-                    >
-                      {availableColumns.map(col => (
-                        <option key={col} value={col}>{col}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="p-3 border border-gray-300 rounded-md bg-gray-50 text-gray-500 text-center">
-                      No columns available. Please check your spreadsheet data.
-                    </div>
-                  )}
-                  <p className="text-sm text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple columns</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Label Column
-                  </label>
-                  {availableColumns.length > 0 ? (
-                    <select
-                      value={formData.labelColumn}
-                      onChange={(e) => setFormData(prev => ({ ...prev, labelColumn: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      <option value="">Choose label column...</option>
-                      {availableColumns.map(col => (
-                        <option key={col} value={col}>{col}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="p-3 border border-gray-300 rounded-md bg-gray-50 text-gray-500 text-center">
-                      No columns available
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        );
-
-      case 1:
-        return (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Model Type
-              </label>
-              <div className="grid grid-cols-1 gap-4">
-                {AVAILABLE_MODELS.map(model => (
-                  <div
-                    key={model.id}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      formData.modelType === model.type
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setFormData(prev => ({ ...prev, modelType: model.type }))}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Brain className="h-5 w-5 text-green-600" />
-                      <div>
-                        <h3 className="font-medium text-gray-900">{model.displayName}</h3>
-                        <p className="text-sm text-gray-500">{model.description}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {mlState.showHyperparameters && (
-              <div className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Settings className="h-4 w-4 text-gray-600" />
-                  <h3 className="font-medium text-gray-900">Hyperparameters</h3>
-                </div>
-                <p className="text-sm text-gray-500">
-                  Advanced hyperparameter tuning will be available in future updates.
-                </p>
-              </div>
-            )}
-          </div>
-        );
-
-      case 2:
-        return (
-          <div className="space-y-6">
-            <div className="text-center">
-              <Brain className="h-16 w-16 text-green-600 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Ready to Train</h3>
-              <p className="text-gray-500 mb-6">
-                Your model is configured and ready for training. Click the button below to start.
-              </p>
-              
-              <button
-                onClick={handleTrain}
-                disabled={mlState.isTraining}
-                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+  const renderModelConfigSection = () => (
+    <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="flex items-center space-x-2 mb-4">
+        <Settings className="h-5 w-5 text-gray-600" />
+        <h3 className="text-lg font-medium text-gray-900">Model Configuration</h3>
+      </div>
+      
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Model Type
+          </label>
+          <div className="space-y-2">
+            {AVAILABLE_MODELS.map(model => (
+              <div
+                key={model.id}
+                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                  formData.modelType === model.type
+                    ? 'border-gray-500 bg-gray-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => setFormData(prev => ({ ...prev, modelType: model.type }))}
               >
-                {mlState.isTraining ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Training...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Train Model
-                  </>
-                )}
-              </button>
-            </div>
-
-            {mlState.showDataPreview && (
-              <div className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Eye className="h-4 w-4 text-gray-600" />
-                  <h3 className="font-medium text-gray-900">Data Preview</h3>
-                </div>
-                <p className="text-sm text-gray-500">
-                  Data preview functionality will be available in future updates.
-                </p>
-              </div>
-            )}
-          </div>
-        );
-
-      case 3:
-        return (
-          <div className="space-y-6">
-            {mlState.trainingMetrics && (
-              <div className="border border-gray-200 rounded-lg p-6">
-                <div className="flex items-center space-x-2 mb-4">
-                  <BarChart3 className="h-5 w-5 text-green-600" />
-                  <h3 className="text-lg font-medium text-gray-900">Training Results</h3>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      {(mlState.trainingMetrics.accuracy * 100).toFixed(1)}%
-                    </div>
-                    <div className="text-sm text-gray-500">Accuracy</div>
-                  </div>
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {(mlState.trainingMetrics.f1 * 100).toFixed(1)}%
-                    </div>
-                    <div className="text-sm text-gray-500">F1 Score</div>
-                  </div>
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {(mlState.trainingMetrics.precision * 100).toFixed(1)}%
-                    </div>
-                    <div className="text-sm text-gray-500">Precision</div>
-                  </div>
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <div className="text-2xl font-bold text-orange-600">
-                      {(mlState.trainingMetrics.recall * 100).toFixed(1)}%
-                    </div>
-                    <div className="text-sm text-gray-500">Recall</div>
+                <div className="flex items-center space-x-3">
+                  <Brain className="h-4 w-4 text-gray-600" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">{model.displayName}</h4>
+                    <p className="text-sm text-gray-500">{model.description}</p>
                   </div>
                 </div>
-
-                <div className="flex space-x-3">
-                  <button
-                    onClick={handlePredict}
-                    disabled={mlState.isPredicting}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                  >
-                    {mlState.isPredicting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
-                        Predicting...
-                      </>
-                    ) : (
-                      <>
-                        <Target className="h-4 w-4 mr-2" />
-                        Make Predictions
-                      </>
-                    )}
-                  </button>
-                  
-                  <button
-                    onClick={() => MLService.downloadModel(mlState.modelPath!)}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Model
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {mlState.predictionResults && (
-              <div className="border border-gray-200 rounded-lg p-6">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Target className="h-5 w-5 text-blue-600" />
-                  <h3 className="text-lg font-medium text-gray-900">Prediction Results</h3>
-                </div>
-                
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-2">Predictions:</div>
-                  <div className="grid grid-cols-5 gap-2">
-                    {mlState.predictionResults.map((pred, index) => (
-                      <div key={index} className="text-center p-2 bg-white rounded border">
-                        {pred}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  const canProceed = () => {
-    switch (mlState.currentStep) {
-      case 0:
-        return formData.sheetId && formData.featureColumns.length > 0 && formData.labelColumn;
-      case 1:
-        return formData.modelType;
-      case 2:
-        return true;
-      case 3:
-        return true;
-      default:
-        return false;
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Brain className="h-6 w-6 text-white" />
-              <h2 className="text-xl font-semibold text-white">Machine Learning</h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors"
-            >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Progress Steps */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            {steps.map((step, index) => (
-              <div key={index} className="flex items-center">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                  index <= mlState.currentStep
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-200 text-gray-600'
-                }`}>
-                  {index < mlState.currentStep ? (
-                    <CheckCircle className="h-5 w-5" />
-                  ) : (
-                    <span className="text-sm font-medium">{index + 1}</span>
-                  )}
-                </div>
-                <div className="ml-3">
-                  <div className={`text-sm font-medium ${
-                    index <= mlState.currentStep ? 'text-gray-900' : 'text-gray-500'
-                  }`}>
-                    {step.title}
-                  </div>
-                  <div className="text-xs text-gray-400">{step.description}</div>
-                </div>
-                {index < steps.length - 1 && (
-                  <ArrowRight className="h-4 w-4 text-gray-400 mx-4" />
-                )}
               </div>
             ))}
           </div>
         </div>
 
-        {/* Content */}
-        <div className="px-6 py-6 overflow-y-auto max-h-[60vh]">
-          {renderStepContent()}
+        <div className="border-t pt-4">
+          <button
+            onClick={handleTrain}
+            disabled={mlState.isTraining || !formData.sheetId || !formData.featureColumns.length || !formData.labelColumn || !formData.modelType}
+            className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {mlState.isTraining ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Training...
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4 mr-2" />
+                Train Model
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMetricsSection = () => (
+    <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="flex items-center space-x-2 mb-4">
+        <BarChart3 className="h-5 w-5 text-gray-600" />
+        <h3 className="text-lg font-medium text-gray-900">Training Metrics</h3>
+      </div>
+      
+      {mlState.trainingMetrics ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-xl font-bold text-gray-900">
+                {(mlState.trainingMetrics.accuracy * 100).toFixed(1)}%
+              </div>
+              <div className="text-xs text-gray-500">Accuracy</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-xl font-bold text-gray-700">
+                {(mlState.trainingMetrics.f1 * 100).toFixed(1)}%
+              </div>
+              <div className="text-xs text-gray-500">F1 Score</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-xl font-bold text-gray-800">
+                {(mlState.trainingMetrics.precision * 100).toFixed(1)}%
+              </div>
+              <div className="text-xs text-gray-500">Precision</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-xl font-bold text-gray-600">
+                {(mlState.trainingMetrics.recall * 100).toFixed(1)}%
+              </div>
+              <div className="text-xs text-gray-500">Recall</div>
+            </div>
+          </div>
+          
+          <div className="flex space-x-2">
+            <button
+              onClick={() => MLService.downloadModel(mlState.modelPath!)}
+              className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download Model
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-8 text-gray-500">
+          <BarChart3 className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+          <p>No training results yet</p>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderPredictionSection = () => (
+    <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="flex items-center space-x-2 mb-4">
+        <Target className="h-5 w-5 text-gray-600" />
+        <h3 className="text-lg font-medium text-gray-900">Make Predictions</h3>
+      </div>
+      
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Prediction Spreadsheet
+          </label>
+          <select
+            value={predictionSheetId}
+            onChange={(e) => setPredictionSheetId(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+          >
+            <option value="">Choose a spreadsheet...</option>
+            {availableSheets.map(sheet => (
+              <option key={sheet.id} value={sheet.id}>{sheet.name}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={handlePrevious}
-              disabled={mlState.currentStep === 0}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        {predictionSheetId && predictionColumns.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Feature Columns (must match training data)
+            </label>
+            <select
+              multiple
+              value={formData.featureColumns}
+              onChange={(e) => {
+                const selected = Array.from(e.target.selectedOptions, option => option.value);
+                setFormData(prev => ({ ...prev, featureColumns: selected }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 min-h-[80px]"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Previous
-            </button>
+              {predictionColumns.map(col => (
+                <option key={col} value={col}>{col}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
-            <div className="flex space-x-3">
-              {mlState.currentStep < 3 && (
-                <button
-                  onClick={handleNext}
-                  disabled={!canProceed()}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </button>
-              )}
+        <button
+          onClick={handlePredict}
+          disabled={mlState.isPredicting || !predictionSheetId || !formData.featureColumns.length || !mlState.modelPath}
+          className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {mlState.isPredicting ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Predicting...
+            </>
+          ) : (
+            <>
+              <Zap className="h-4 w-4 mr-2" />
+              Make Predictions
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderResultsSection = () => {
+    const getPredictionData = () => {
+      if (!mlState.predictionResults || !predictionSheetData || !formData.featureColumns.length) {
+        return [];
+      }
+
+      const results = [];
+      let maxRow = 0;
+      
+      // Find the maximum row index
+      Object.keys(predictionSheetData).forEach(cellKey => {
+        const parts = cellKey.split('-');
+        if (parts.length === 2) {
+          const rowIndex = parseInt(parts[0]);
+          if (!isNaN(rowIndex) && rowIndex > maxRow) {
+            maxRow = rowIndex;
+          }
+        }
+      });
+
+      // Start from row 1 (skip header row 0)
+      for (let row = 1; row <= maxRow; row++) {
+        const rowData: any = { row, features: {}, prediction: null };
+        
+        // Extract feature values
+        for (const featureCol of formData.featureColumns) {
+          for (let col = 0; col <= 26; col++) {
+            const cellKey = `${row}-${col}`;
+            const cellData = predictionSheetData[cellKey];
+            if (cellData && cellData.value && cellData.value.trim() !== '') {
+              const headerKey = `0-${col}`;
+              const headerData = predictionSheetData[headerKey];
+              if (headerData && headerData.value && headerData.value.trim() === featureCol) {
+                rowData.features[featureCol] = cellData.value;
+                break;
+              }
+            }
+          }
+        }
+        
+        // Add prediction if we have all features
+        if (Object.keys(rowData.features).length === formData.featureColumns.length) {
+          const predictionIndex = row - 1;
+          if (predictionIndex < mlState.predictionResults.length) {
+            rowData.prediction = mlState.predictionResults[predictionIndex];
+            results.push(rowData);
+          }
+        }
+      }
+      
+      return results;
+    };
+
+    const predictionData = getPredictionData();
+
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center space-x-2 mb-4">
+          <TrendingUp className="h-5 w-5 text-gray-600" />
+          <h3 className="text-lg font-medium text-gray-900">Prediction Results</h3>
+        </div>
+        
+        {predictionData.length > 0 ? (
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="text-sm text-gray-600 mb-3">
+                Predictions with Feature Values ({predictionData.length} rows):
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-2 px-2 font-medium text-gray-700">Row</th>
+                      {formData.featureColumns.map(col => (
+                        <th key={col} className="text-left py-2 px-2 font-medium text-gray-700">{col}</th>
+                      ))}
+                      <th className="text-left py-2 px-2 font-medium text-gray-700">Prediction</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {predictionData.map((row, index) => (
+                      <tr key={index} className="border-b border-gray-100">
+                        <td className="py-2 px-2 text-gray-600">{row.row}</td>
+                        {formData.featureColumns.map(col => (
+                          <td key={col} className="py-2 px-2">{row.features[col] || '-'}</td>
+                        ))}
+                        <td className="py-2 px-2 font-medium text-gray-900">{row.prediction}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <TrendingUp className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+            <p>No predictions yet</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-100 z-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Brain className="h-6 w-6 text-gray-700" />
+            <h2 className="text-xl font-semibold text-gray-900">Machine Learning Dashboard</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Dashboard Content */}
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full grid grid-cols-12 gap-4 p-4">
+          {/* Left Column - Data Selection & Model Config */}
+          <div className="col-span-4 space-y-4">
+            {renderDataSelectionSection()}
+            {renderModelConfigSection()}
+          </div>
+
+          {/* Middle Column - Metrics & Training */}
+          <div className="col-span-4 space-y-4">
+            {renderMetricsSection()}
+          </div>
+
+          {/* Right Column - Prediction & Results */}
+          <div className="col-span-4 space-y-4">
+            {renderPredictionSection()}
+            {renderResultsSection()}
           </div>
         </div>
       </div>
