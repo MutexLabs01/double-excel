@@ -1,10 +1,57 @@
-import React from "react";
+import React, { useState } from "react";
 import Navbar from "./Navbar";
+import Terminal from "./Terminal";
 
-const Dashboard: React.FC = () => {
+interface DashboardProps {
+  projects: { id: string; name: string }[];
+  currentProjectId: string | null;
+  projectData: any;
+  onCreateProject: (name: string) => void;
+  onOpenProject: (id: string) => void;
+  onShowModal: (
+    type: "project" | "sheet" | "chart" | "rename" | "checkpoint",
+    onSubmit: (name: string) => void
+  ) => void;
+  onExportFile?: (filename: string) => void;
+}
+
+const Files = [
+  {
+    name: "File 1",
+    type: 1,
+    id: 0,
+  },
+  {
+    name: "File 2",
+    type: 1,
+    id: 1,
+  },
+  {
+    name: "File 3",
+    type: 1,
+    id: 2,
+  },
+  {
+    name: "File 4",
+    type: 1,
+    id: 3,
+  },
+  
+];
+
+const Dashboard: React.FC<DashboardProps> = ({
+  projects,
+  currentProjectId,
+  projectData,
+  onCreateProject,
+  onOpenProject,
+  onShowModal,
+  onExportFile,
+}) => {
+  const [isClicked, setisClicked] = useState<number>(0);
+
   return (
     <div className="flex h-screen bg-gray-900 text-white">
-      
       <Navbar />
 
       {/* Main Content */}
@@ -13,39 +60,43 @@ const Dashboard: React.FC = () => {
 
         {/* File Type Tabs */}
         <div className="flex space-x-3">
-          <button className="px-4 py-2 bg-blue-600 rounded-lg font-medium">File Type 1</button>
-          <button className="px-4 py-2 bg-gray-700 rounded-lg font-medium">File Type 2</button>
-          <button className="px-4 py-2 bg-gray-700 rounded-lg font-medium">File Type 3</button>
-          <button className="px-4 py-2 bg-gray-700 rounded-lg font-medium">File Type 4</button>
+          {Files.map((file) => (
+            <button
+              onClick={() => {
+                setisClicked(file.id);
+              }}
+              className={`px-4 py-2 rounded-lg font-medium ${
+                isClicked === file.id ? "bg-blue-600" : "bg-gray-700"
+              }`}
+              key={file.id}
+            >
+              File Type {file.id + 1}
+            </button>
+          ))}
         </div>
 
         <div className="flex flex-1 space-x-6">
           {/* File Grid */}
           <div className="grid grid-cols-2 gap-6 flex-1">
-            {Array(4)
-              .fill(null)
-              .map((_, i) => (
+            {
+              Files.map((file) => (
                 <div
-                  key={i}
-                  className="bg-gray-700 rounded-2xl shadow-md flex items-end p-4"
+                  key={file.id}
+                  className="bg-gray-700 rounded-2xl shadow-md flex items-end p-4 overflow-y-auto"
                 >
-                  <p className="font-medium">File 1 of nth Type</p>
+                  <p className="font-medium">File {file.id + 1} of {isClicked + 1} Type</p>
                 </div>
               ))}
           </div>
 
           {/* Right Terminal Section */}
-          <div className="w-1/3 bg-gray-800 rounded-xl p-4 flex flex-col justify-between border border-gray-700">
-            <div>
-              <h2 className="font-semibold mb-2">Welcome to double excel terminal</h2>
-              <p className="text-gray-400 text-sm">
-                Type help to show our commands
-              </p>
-            </div>
-            <input
-              type="text"
-              placeholder=""
-              className="w-full bg-gray-900 rounded-md mt-4 p-2 outline-none text-white"
+          <div className="w-[30vw] max-w-3xl m-x-2 h-full">
+            <Terminal
+              projects={projects}
+              currentProjectId={currentProjectId}
+              projectData={projectData}
+              onOpenProject={onOpenProject}
+              onExportFile={onExportFile}
             />
           </div>
         </div>
