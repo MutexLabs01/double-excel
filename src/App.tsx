@@ -469,7 +469,7 @@ function App() {
   // In the dashboard UI, show project list and create button
   return (
     <>
-      <SignedIn>
+    <SignedIn>
         {showProjectDashboard || !currentProjectId ? (
           <>
           <Navbar />
