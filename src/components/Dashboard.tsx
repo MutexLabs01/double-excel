@@ -1,7 +1,6 @@
-import React from 'react';
-import NewsPanel from './NewsPanel';
-import Terminal from './Terminal';
-import TypewriterEffect from './TypewriterEffect';
+import React, { useState } from "react";
+import Navbar from "./Navbar";
+import Terminal from "./Terminal";
 
 interface DashboardProps {
   projects: { id: string; name: string }[];
@@ -9,75 +8,101 @@ interface DashboardProps {
   projectData: any;
   onCreateProject: (name: string) => void;
   onOpenProject: (id: string) => void;
-  onShowModal: (type: 'project' | 'sheet' | 'chart' | 'rename' | 'checkpoint', onSubmit: (name: string) => void) => void;
+  onShowModal: (
+    type: "project" | "sheet" | "chart" | "rename" | "checkpoint",
+    onSubmit: (name: string) => void
+  ) => void;
   onExportFile?: (filename: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ 
-  projects, 
-  currentProjectId, 
-  projectData, 
-  onCreateProject, 
-  onOpenProject, 
-  onShowModal,
-  onExportFile 
-}) => (
-  <div className="min-h-screen flex bg-gray-50">
-    {/* Sidebar: Project List */}
-    <aside className="w-80 bg-white border-r border-gray-200 flex flex-col p-6">
-      <h2 className="text-xl font-bold mb-6 text-gray-900">Your Projects</h2>
-      
-      {/* New Project Button at Top */}
-      <button
-        className="w-full px-4 py-3 bg-black text-white rounded-lg text-lg font-semibold shadow hover:bg-green-700 transition-colors mb-4"
-        onClick={() => onShowModal('project', onCreateProject)}
-      >
-        + New Project
-      </button>
-      
-      <ul className="space-y-2 flex-1 overflow-y-auto">
-        {projects.map(project => (
-          <li key={project.id}>
-            <button
-              className="w-full text-left px-4 py-3 rounded-lg bg-gray-100 hover:bg-green-100 transition-colors font-medium text-gray-800 shadow-sm"
-              onClick={() => onOpenProject(project.id)}
-            >
-              {project.name}
-            </button>
-          </li>
-        ))}
-        {projects.length === 0 && <li className="text-gray-500">No projects yet. Create one!</li>}
-      </ul>
-    </aside>
-    
-    {/* Main Content */}
-    <main className="flex-1 mt-3 flex flex-col items-center pt-0">
-      <div className="text-5xl mt-3 mb-12 text-gray-900 font-extrabold">
-        <TypewriterEffect 
-          text="DOUBLE EXCEL" 
-          speed={120} 
-          delay={800}
-          className="text-gray-900"
-          repeat={true}
-          repeatDelay={5000}
-        />
-      </div>
-      <div className="w-full max-w-3xl" style={{ height: '60vh', margin: '2rem' }}>
-        <Terminal
-          projects={projects}
-          currentProjectId={currentProjectId}
-          projectData={projectData}
-          onOpenProject={onOpenProject}
-          onExportFile={onExportFile}
-        />
-      </div>
-    </main>
-    
-    {/* News Panel */}
-    <aside className="w-96 bg-gray-50 p-6 overflow-y-auto">
-      <NewsPanel />
-    </aside>
-  </div>
-);
+const Files = [
+  {
+    name: "File 1",
+    type: 1,
+    id: 0,
+  },
+  {
+    name: "File 2",
+    type: 1,
+    id: 1,
+  },
+  {
+    name: "File 3",
+    type: 1,
+    id: 2,
+  },
+  {
+    name: "File 4",
+    type: 1,
+    id: 3,
+  },
+  
+];
 
-export default Dashboard; 
+const Dashboard: React.FC<DashboardProps> = ({
+  projects,
+  currentProjectId,
+  projectData,
+  onCreateProject,
+  onOpenProject,
+  onShowModal,
+  onExportFile,
+}) => {
+  const [isClicked, setisClicked] = useState<number>(0);
+
+  return (
+    <div className="flex h-screen bg-gray-900 text-white">
+      <Navbar />
+
+      {/* Main Content */}
+      <div className="flex flex-1 flex-col p-6 space-y-6">
+        <h1 className="text-4xl font-bold">Welcome User!</h1>
+
+        {/* File Type Tabs */}
+        <div className="flex space-x-3">
+          {Files.map((file) => (
+            <button
+              onClick={() => {
+                setisClicked(file.id);
+              }}
+              className={`px-4 py-2 rounded-lg font-medium ${
+                isClicked === file.id ? "bg-blue-600" : "bg-gray-700"
+              }`}
+              key={file.id}
+            >
+              File Type {file.id + 1}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-1 space-x-6">
+          {/* File Grid */}
+          <div className="grid grid-cols-2 gap-6 flex-1">
+            {
+              Files.map((file) => (
+                <div
+                  key={file.id}
+                  className="bg-gray-700 rounded-2xl shadow-md flex items-end p-4 overflow-y-auto"
+                >
+                  <p className="font-medium">File {file.id + 1} of {isClicked + 1} Type</p>
+                </div>
+              ))}
+          </div>
+
+          {/* Right Terminal Section */}
+          <div className="w-[30vw] max-w-3xl m-x-2 h-full">
+            <Terminal
+              projects={projects}
+              currentProjectId={currentProjectId}
+              projectData={projectData}
+              onOpenProject={onOpenProject}
+              onExportFile={onExportFile}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
