@@ -21,6 +21,7 @@ import FinancialModeling from './components/FinancialModeling';
 import MLPanel from './components/MLPanel';
 import { RoomProvider, useStorage, useMutation } from '@liveblocks/react';
 import { LiveObject } from '@liveblocks/client';
+import Navbar from './components/Navbar';
 
 function App() {
   const { user } = useUser();
@@ -470,6 +471,8 @@ function App() {
     <>
       <SignedIn>
         {showProjectDashboard || !currentProjectId ? (
+          <>
+          <Navbar />
           <Dashboard
             projects={projects}
             currentProjectId={currentProjectId}
@@ -480,7 +483,7 @@ function App() {
             onExportFile={(filename) => {
               console.log(`Exporting file: ${filename}`);
             }}
-          />
+          /></>
         ) : (
           <RoomProvider
             id={currentProjectId}
