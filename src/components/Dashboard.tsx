@@ -73,7 +73,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
     </main>
     
-    {/* News Panel */}
     <aside className="w-96 bg-gray-50 p-6 overflow-y-auto">
       <NewsPanel />
     </aside>

@@ -20,7 +20,8 @@ import DiffPanel from './components/DiffPanel';
 import FinancialModeling from './components/FinancialModeling';
 import MLPanel from './components/MLPanel';
 import { RoomProvider, useStorage, useMutation } from '@liveblocks/react';
-import { LiveObject } from '@liveblocks/client';
+import { LiveObject } from '@liveblocks/client'
+import Footer from './components/Footer';
 
 function App() {
   const { user } = useUser();
@@ -574,6 +575,7 @@ function App() {
           />
         )}
       </Modal>
+      <Footer/>
     </>
   );
 }
