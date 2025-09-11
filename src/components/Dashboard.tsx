@@ -1,83 +1,57 @@
-import React from 'react';
-import NewsPanel from './NewsPanel';
-import Terminal from './Terminal';
-import TypewriterEffect from './TypewriterEffect';
+import React from "react";
+import Navbar from "./Navbar";
 
-interface DashboardProps {
-  projects: { id: string; name: string }[];
-  currentProjectId: string | null;
-  projectData: any;
-  onCreateProject: (name: string) => void;
-  onOpenProject: (id: string) => void;
-  onShowModal: (type: 'project' | 'sheet' | 'chart' | 'rename' | 'checkpoint', onSubmit: (name: string) => void) => void;
-  onExportFile?: (filename: string) => void;
-}
-
-const Dashboard: React.FC<DashboardProps> = ({ 
-  projects, 
-  currentProjectId, 
-  projectData, 
-  onCreateProject, 
-  onOpenProject, 
-  onShowModal,
-  onExportFile 
-}) => (
-  <div className="min-h-screen flex bg-gray-50">
-    {/* Sidebar: Project List */}
-    <aside className="w-80 bg-white border-r border-gray-200 flex flex-col p-6">
-      <h2 className="text-xl font-bold mb-6 text-gray-900">Your Projects</h2>
+const Dashboard: React.FC = () => {
+  return (
+    <div className="flex h-screen bg-gray-900 text-white">
       
-      {/* New Project Button at Top */}
-      <button
-        className="w-full px-4 py-3 bg-black text-white rounded-lg text-lg font-semibold shadow hover:bg-green-700 transition-colors mb-4"
-        onClick={() => onShowModal('project', onCreateProject)}
-      >
-        + New Project
-      </button>
-      
-      <ul className="space-y-2 flex-1 overflow-y-auto">
-        {projects.map(project => (
-          <li key={project.id}>
-            <button
-              className="w-full text-left px-4 py-3 rounded-lg bg-gray-100 hover:bg-green-100 transition-colors font-medium text-gray-800 shadow-sm"
-              onClick={() => onOpenProject(project.id)}
-            >
-              {project.name}
-            </button>
-          </li>
-        ))}
-        {projects.length === 0 && <li className="text-gray-500">No projects yet. Create one!</li>}
-      </ul>
-    </aside>
-    
-    {/* Main Content */}
-    <main className="flex-1 mt-3 flex flex-col items-center pt-0">
-      <div className="text-5xl mt-3 mb-12 text-gray-900 font-extrabold">
-        <TypewriterEffect 
-          text="DOUBLE EXCEL" 
-          speed={120} 
-          delay={800}
-          className="text-gray-900"
-          repeat={true}
-          repeatDelay={5000}
-        />
-      </div>
-      <div className="w-full max-w-3xl" style={{ height: '60vh', margin: '2rem' }}>
-        <Terminal
-          projects={projects}
-          currentProjectId={currentProjectId}
-          projectData={projectData}
-          onOpenProject={onOpenProject}
-          onExportFile={onExportFile}
-        />
-      </div>
-    </main>
-    
-    {/* News Panel */}
-    <aside className="w-96 bg-gray-50 p-6 overflow-y-auto">
-      <NewsPanel />
-    </aside>
-  </div>
-);
+      <Navbar />
 
-export default Dashboard; 
+      {/* Main Content */}
+      <div className="flex flex-1 flex-col p-6 space-y-6">
+        <h1 className="text-4xl font-bold">Welcome User!</h1>
+
+        {/* File Type Tabs */}
+        <div className="flex space-x-3">
+          <button className="px-4 py-2 bg-blue-600 rounded-lg font-medium">File Type 1</button>
+          <button className="px-4 py-2 bg-gray-700 rounded-lg font-medium">File Type 2</button>
+          <button className="px-4 py-2 bg-gray-700 rounded-lg font-medium">File Type 3</button>
+          <button className="px-4 py-2 bg-gray-700 rounded-lg font-medium">File Type 4</button>
+        </div>
+
+        <div className="flex flex-1 space-x-6">
+          {/* File Grid */}
+          <div className="grid grid-cols-2 gap-6 flex-1">
+            {Array(4)
+              .fill(null)
+              .map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-gray-700 rounded-2xl shadow-md flex items-end p-4"
+                >
+                  <p className="font-medium">File 1 of nth Type</p>
+                </div>
+              ))}
+          </div>
+
+          {/* Right Terminal Section */}
+          <div className="w-1/3 bg-gray-800 rounded-xl p-4 flex flex-col justify-between border border-gray-700">
+            <div>
+              <h2 className="font-semibold mb-2">Welcome to double excel terminal</h2>
+              <p className="text-gray-400 text-sm">
+                Type help to show our commands
+              </p>
+            </div>
+            <input
+              type="text"
+              placeholder=""
+              className="w-full bg-gray-900 rounded-md mt-4 p-2 outline-none text-white"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
