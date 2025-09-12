@@ -22,6 +22,10 @@ import MLPanel from './components/MLPanel';
 import { RoomProvider, useStorage, useMutation } from '@liveblocks/react';
 import { LiveObject } from '@liveblocks/client'
 import Footer from './components/Footer';
+import AboutUs from './components/AboutUs';
+import Pricing from './components/Pricing';
+import { Routes, Route } from "react-router-dom";
+import Documentation from './components/Documentation';
 
 function App() {
   const { user } = useUser();
@@ -470,53 +474,31 @@ function App() {
   return (
     <>
       <SignedIn>
-        {showProjectDashboard || !currentProjectId ? (
-          <Dashboard
-            projects={projects}
-            currentProjectId={currentProjectId}
-            projectData={{ files: {}, folders: {} }}
-            onCreateProject={createNewProject}
-            onOpenProject={handleOpenProject}
-            onShowModal={(type, onSubmit) => setModal({ type, onSubmit })}
-            onExportFile={(filename) => {
-              console.log(`Exporting file: ${filename}`);
-            }}
-          />
-        ) : (
-          <RoomProvider
-            id={currentProjectId}
-            initialStorage={{ project: new LiveObject({ files: {}, folders: {} }) }}
-          >
-            <ProjectRoom
-              currentProjectId={currentProjectId}
-              user={user}
-              projects={projects}
-              setShowProjectDashboard={setShowProjectDashboard}
-              createCheckpoint={createCheckpoint}
-              getCurrentVersionName={getCurrentVersionName}
-              unsavedChanges={unsavedChanges}
-              showHistory={showHistory}
-              setShowHistory={setShowHistory}
-              showDiff={showDiff}
-              setShowDiff={setShowDiff}
-              versions={versions}
-              currentVersion={currentVersion}
-              restoreVersion={restoreVersion}
-              showDiffView={showDiffView}
-              compareVersion={compareVersion}
-              setCompareVersion={setCompareVersion}
-              shareLink={shareLink || undefined}
-              handleShare={handleShare}
-              setModal={setModal}
-              setModalInput={setModalInput}
-              setModalExtra={setModalExtra}
-              handleShowML={handleShowML}
-              handleCloseML={handleCloseML}
-              showML={showML}
-            />
-          </RoomProvider>
-        )}
-      </SignedIn>
+  <Routes>
+    <Route
+      path="/"
+      element={
+        <Dashboard
+          projects={projects}
+          currentProjectId={currentProjectId}
+          projectData={{ files: {}, folders: {} }}
+          onCreateProject={createNewProject}
+          onOpenProject={handleOpenProject}
+          onShowModal={(type, onSubmit) => setModal({ type, onSubmit })}
+          onExportFile={(filename) => {
+            console.log(`Exporting file: ${filename}`);
+          }}
+        />
+      }
+    />
+    <Route path="/aboutus" element={<AboutUs />} />
+    <Route path="/pricing" element={<Pricing />} />
+    <Route path="/documentation" element={<Documentation/>} />
+    {/* add other routes here */}
+  </Routes>
+</SignedIn>
+
+      
       <SignedOut>
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <SignIn routing="hash" />
