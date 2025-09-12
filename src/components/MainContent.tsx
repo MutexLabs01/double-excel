@@ -50,7 +50,7 @@ const MainContent: React.FC<MainContentProps> = ({
       <div className="h-full flex items-center justify-center bg-white">
         <div className="text-center">
           <FolderOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No file selected</h3>
+          <h3 className="text-lg font-medium text-gra`y-900 mb-2">No file selected</h3>
           <p className="text-gray-500 mb-4">Create a new spreadsheet or chart to get started</p>
           <div className="grid grid-cols-3 gap-2">
             <button

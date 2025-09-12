@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react'; 
 import { 
   FileSpreadsheet, 
   BarChart3, 
@@ -7,9 +7,11 @@ import {
   MoreVertical, 
   Trash2, 
   Edit, 
-  Plus 
+  Plus,
+  Search,
+  X
 } from 'lucide-react';
-import { ProjectData, FileItem, FolderItem } from '../types/project';
+import { ProjectData, FileItem, FolderItem } from '../types/project'; 
 
 interface SidebarProps {
   projectData: ProjectData;
@@ -20,16 +22,73 @@ interface SidebarProps {
   onCreateFolder: (name: string, parentFolder?: string) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({
-  projectData,
-  activeFile,
-  onFileSelect,
-  onFileDelete,
-  onFileRename,
-  onCreateFolder
-}) => {
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; fileId: string } | null>(null);
+const Sidebar: React.FC<SidebarProps> = ({ 
+  projectData, 
+  activeFile, 
+  onFileSelect, 
+  onFileDelete, 
+  onFileRename, 
+  onCreateFolder 
+}) => { 
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set()); 
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; fileId: string } | null>(null); 
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Filter and sort files based on search query
+  const filteredData = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return projectData;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    const filteredFiles: { [key: string]: FileItem } = {};
+    const filteredFolders: { [key: string]: FolderItem } = {};
+
+    // Filter files that match the search query
+    Object.entries(projectData.files).forEach(([id, file]) => {
+      if (file.name?.toLowerCase().includes(query)) {
+        filteredFiles[id] = file;
+        
+        // Include parent folders of matching files
+        let currentFolderId = file.parentFolder;
+        while (currentFolderId && projectData.folders[currentFolderId]) {
+          if (!filteredFolders[currentFolderId]) {
+            filteredFolders[currentFolderId] = projectData.folders[currentFolderId];
+          }
+          currentFolderId = projectData.folders[currentFolderId].parentFolder;
+        }
+      }
+    });
+
+    // Also include folders that match the search query
+    Object.entries(projectData.folders).forEach(([id, folder]) => {
+      if (folder.name.toLowerCase().includes(query)) {
+        filteredFolders[id] = folder;
+        
+        // Include parent folders
+        let currentFolderId = folder.parentFolder;
+        while (currentFolderId && projectData.folders[currentFolderId]) {
+          if (!filteredFolders[currentFolderId]) {
+            filteredFolders[currentFolderId] = projectData.folders[currentFolderId];
+          }
+          currentFolderId = projectData.folders[currentFolderId].parentFolder;
+        }
+      }
+    });
+
+    return {
+      files: filteredFiles,
+      folders: filteredFolders
+    };
+  }, [projectData, searchQuery]);
+
+  // Auto-expand folders when searching
+  React.useEffect(() => {
+    if (searchQuery.trim()) {
+      const allFolderIds = Object.keys(filteredData.folders);
+      setExpandedFolders(new Set(allFolderIds));
+    }
+  }, [searchQuery, filteredData.folders]);
 
   const toggleFolder = (folderId: string) => {
     setExpandedFolders(prev => {
@@ -66,6 +125,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     closeContextMenu();
   };
 
+  const clearSearch = () => {
+    setSearchQuery('');
+  };
+
   const renderFileIcon = (type: string) => {
     switch (type) {
       case 'spreadsheet':
@@ -79,8 +142,28 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const renderFolder = (folder: FolderItem, level: number = 0) => {
     const isExpanded = expandedFolders.has(folder.id);
-    const childFolders = Object.values(projectData.folders).filter(f => f.parentFolder === folder.id);
-    const childFiles = Object.values(projectData.files).filter(f => f.parentFolder === folder.id);
+    const childFolders = Object.values(filteredData.folders).filter(f => f.parentFolder === folder.id);
+    const childFiles = Object.values(filteredData.files).filter(f => f.parentFolder === folder.id);
+
+    // Highlight search matches
+    const highlightMatch = (text: string) => {
+      if (!searchQuery.trim()) return text;
+      
+      const query = searchQuery.toLowerCase();
+      const index = text.toLowerCase().indexOf(query);
+      
+      if (index === -1) return text;
+      
+      return (
+        <>
+          {text.substring(0, index)}
+          <span className="bg-yellow-200 text-yellow-900 px-1 rounded">
+            {text.substring(index, index + query.length)}
+          </span>
+          {text.substring(index + query.length)}
+        </>
+      );
+    };
 
     return (
       <div key={folder.id}>
@@ -94,13 +177,21 @@ const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             <Folder className="h-4 w-4 text-green-600" />
           )}
-          <span className="flex-1 truncate text-gray-900">{folder.name}</span>
+          <span className="flex-1 truncate text-gray-900">
+            {highlightMatch(folder.name)}
+          </span>
         </div>
 
         {isExpanded && (
           <div>
-            {childFolders.map(childFolder => renderFolder(childFolder, level + 1))}
-            {childFiles.map(file => renderFile(file, level + 1))}
+            {childFolders
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(childFolder => renderFolder(childFolder, level + 1))
+            }
+            {childFiles
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(file => renderFile(file, level + 1))
+            }
           </div>
         )}
       </div>
@@ -110,10 +201,30 @@ const Sidebar: React.FC<SidebarProps> = ({
   const renderFile = (file: FileItem, level: number = 0) => {
     const isActive = activeFile === file.id;
 
+    // Highlight search matches
+    const highlightMatch = (text: string) => {
+      if (!searchQuery.trim()) return text;
+      
+      const query = searchQuery.toLowerCase();
+      const index = text.toLowerCase().indexOf(query);
+      
+      if (index === -1) return text;
+      
+      return (
+        <>
+          {text.substring(0, index)}
+          <span className="bg-yellow-200 text-yellow-900 px-1 rounded">
+            {text.substring(index, index + query.length)}
+          </span>
+          {text.substring(index + query.length)}
+        </>
+      );
+    };
+
     return (
       <div
         key={file.id}
-        className={`flex items-center space-x-2 px-3 py-2 text-sm cursor-pointer rounded-md ${
+        className={`group flex items-center space-x-2 px-3 py-2 text-sm cursor-pointer rounded-md ${
           isActive ? 'bg-blue-100 text-blue-900' : 'text-gray-700 hover:bg-gray-100'
         }`}
         style={{ paddingLeft: `${12 + level * 16}px` }}
@@ -121,7 +232,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         onContextMenu={(e) => handleContextMenu(e, file.id)}
       >
         {renderFileIcon(file.type)}
-        <span className="flex-1 truncate">{file.name}</span>
+        <span className="flex-1 truncate">
+          {highlightMatch(file.name)}
+        </span>
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -135,22 +248,72 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  // Get root level items
-  const rootFolders = Object.values(projectData.folders).filter(f => !f.parentFolder);
-  const rootFiles = Object.values(projectData.files).filter(f => !f.parentFolder);
+  // Get root level items from filtered data
+  const rootFolders = Object.values(filteredData.folders)
+    .filter(f => !f.parentFolder)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const rootFiles = Object.values(filteredData.files || {})
+      .filter(f => f && !f.parentFolder && f.name) // only keep files with a name
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  const hasContent = Object.keys(projectData.files).length > 0 || Object.keys(projectData.folders).length > 0;
+  const hasFilteredContent = Object.keys(filteredData.files).length > 0 || Object.keys(filteredData.folders).length > 0;
 
   return (
-    <div className="flex-1 overflow-y-auto p-2">
-      <div className="space-y-1">
+    <div className="w-48 md:w-64 lg:w-72 overflow-y-auto p-2 flex flex-col">
+      {/* Search Bar */}
+      {hasContent && (
+        <div className="mb-4 px-1">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              className="block w-fit pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Search files..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <button
+                  onClick={clearSearch}
+                  className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
+          {searchQuery && (
+            <div className="text-xs text-gray-500 mt-1 px-1">
+              {Object.keys(filteredData.files).length + Object.keys(filteredData.folders).length} results
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* File Tree */}
+      <div className="flex-1 space-y-1">
         {rootFolders.map(folder => renderFolder(folder))}
         {rootFiles.map(file => renderFile(file))}
       </div>
 
-      {Object.keys(projectData.files).length === 0 && Object.keys(projectData.folders).length === 0 && (
+      {/* Empty States */}
+      {!hasContent && (
         <div className="text-center py-8 text-gray-500">
           <Folder className="h-8 w-8 mx-auto mb-2 text-gray-400" />
           <p className="text-sm">No files yet</p>
           <p className="text-xs">Create your first file to get started</p>
+        </div>
+      )}
+
+      {hasContent && !hasFilteredContent && searchQuery && (
+        <div className="text-center py-8 text-gray-500">
+          <Search className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+          <p className="text-sm">No results found</p>
+          <p className="text-xs">Try a different search term</p>
         </div>
       )}
 

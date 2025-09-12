@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserButton } from '@clerk/clerk-react';
-import { Save, History, Download, Upload, Brain } from 'lucide-react';
+import { Save, History, Download, Upload, Brain, Share2} from 'lucide-react';
 
 interface HeaderBarProps {
   projectName: string;
@@ -53,8 +53,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             </p>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <UserButton />
+        <div className="flex items-center space-x-2.5">
+          
           {onShowML && (
             <button
               onClick={onShowML}
@@ -68,26 +68,26 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             onClick={onSave}
             className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
           >
-            <Save className="h-4 w-4 mr-1" />
-            Save Checkpoint
+            <Save className="h-4 w-4" />
+            {/* Save Checkpoint */}
           </button>
           <button
             onClick={onShowHistory}
             className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
           >
-            <History className="h-4 w-4 mr-1" />
-            History
+            <History className="h-4 w-4" />
+            {/* History */}
           </button>
           <button
             onClick={onExport}
             className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
           >
-            <Download className="h-4 w-4 mr-1" />
-            Export
+            <Download className="h-4 w-4 " />
+            {/* Export */}
           </button>
           <label className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors cursor-pointer">
-            <Upload className="h-4 w-4 mr-1" />
-            Import
+            <Upload className="h-4 w-4 " />
+            {/* Import */}
             <input
               type="file"
               accept=".csv"
@@ -100,9 +100,11 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
               onClick={onShare}
               className="inline-flex items-center px-3 py-2 border border-blue-500 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             >
-              Share
+              <Share2 className="2 h-4 w-4" />
+              {/* Share */}
             </button>
           )}
+          <UserButton />
         </div>
       </div>
       {shareLink && (
