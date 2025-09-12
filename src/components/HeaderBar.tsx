@@ -12,7 +12,7 @@ interface HeaderBarProps {
   onSave: () => void;
   onShowHistory: () => void;
   onExport: () => void;
-  onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onImport: () => void;
   showHistory: boolean;
   onShare?: () => void;
   shareLink?: string;
@@ -85,16 +85,13 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             <Download className="h-4 w-4 mr-1" />
             Export
           </button>
-          <label className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors cursor-pointer">
+          <button
+            onClick={onImport}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+          >
             <Upload className="h-4 w-4 mr-1" />
             Import
-            <input
-              type="file"
-              accept=".csv"
-              onChange={onImport}
-              className="hidden"
-            />
-          </label>
+          </button>
           {onShare && (
             <button
               onClick={onShare}

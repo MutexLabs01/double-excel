@@ -99,8 +99,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {isExpanded && (
           <div>
-            {childFolders.map(childFolder => renderFolder(childFolder, level + 1))}
-            {childFiles.map(file => renderFile(file, level + 1))}
+            {childFolders.map(childFolder => <div key={childFolder.id}>{renderFolder(childFolder, level + 1)}</div>)}
+            {childFiles.map(file => <div key={file.id}>{renderFile(file, level + 1)}</div>)}
           </div>
         )}
       </div>
@@ -142,8 +142,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div className="flex-1 overflow-y-auto p-2">
       <div className="space-y-1">
-        {rootFolders.map(folder => renderFolder(folder))}
-        {rootFiles.map(file => renderFile(file))}
+        {rootFolders.map(folder => <div key={folder.id}>{renderFolder(folder)}</div>)}
+        {rootFiles.map(file => <div key={file.id}>{renderFile(file)}</div>)}
       </div>
 
       {Object.keys(projectData.files).length === 0 && Object.keys(projectData.folders).length === 0 && (
