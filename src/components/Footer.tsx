@@ -6,7 +6,7 @@ export default function Footer() {
         {/* Brand / CTA (Left Section) */}
         <div className="flex flex-col items-start space-y-6">
           <img
-            src="../../public/mutex.png"
+            src="../../mutex.png"
             alt="Mutex Logo"
             width={120}
             height={120}
