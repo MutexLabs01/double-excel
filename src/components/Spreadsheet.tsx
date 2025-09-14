@@ -164,6 +164,21 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
   const moveSelection = useCallback((direction: 'up' | 'down' | 'left' | 'right', shiftKey = false) => {
     if (!selectedCell) return;
     
+    // Save current editing value before moving
+    if (editingCell) {
+      const [row, col] = editingCell.split('-').map(Number);
+      const isFormula = editValue.startsWith('=');
+      
+      const cellData: CellData = {
+        value: isFormula ? '' : editValue,
+        formula: isFormula ? editValue : null
+      };
+      
+      updateCell(row, col, cellData);
+      setEditingCell(null);
+      setEditValue('');
+    }
+    
     const [currentRow, currentCol] = selectedCell.split('-').map(Number);
     let newRow = currentRow;
     let newCol = currentCol;
@@ -186,10 +201,6 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     const newCellKey = `${newRow}-${newCol}`;
     setSelectedCell(newCellKey);
     
-    // Stop editing when moving with arrow keys
-    setEditingCell(null);
-    setEditValue('');
-    
     if (shiftKey) {
       setSelectionEnd({ row: newRow, col: newCol });
     } else {
@@ -205,7 +216,7 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
         inline: 'nearest'
       });
     }, 0);
-  }, [selectedCell, rows, cols]);
+  }, [selectedCell, editingCell, editValue, updateCell, rows, cols]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (readonly) return;
@@ -238,6 +249,15 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
           const cellData = getCellData(row, col);
           setEditingCell(selectedCell);
           setEditValue(cellData.formula || cellData.value || '');
+          
+          // Focus the input after a brief delay to ensure it's rendered
+          setTimeout(() => {
+            const input = document.querySelector(`[data-cell-input="${selectedCell}"]`) as HTMLInputElement;
+            if (input) {
+              input.focus();
+              input.select(); // Select all text for easy replacement
+            }
+          }, 0);
         }
         break;
       case 'Tab':
@@ -255,6 +275,15 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
           const cellData = getCellData(row, col);
           setEditingCell(selectedCell);
           setEditValue(cellData.formula || cellData.value || '');
+          
+          // Focus the input after a brief delay to ensure it's rendered
+          setTimeout(() => {
+            const input = document.querySelector(`[data-cell-input="${selectedCell}"]`) as HTMLInputElement;
+            if (input) {
+              input.focus();
+              input.select(); // Select all text for easy replacement
+            }
+          }, 0);
         }
         break;
       case 'Delete':
@@ -268,7 +297,7 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
   }, [readonly, moveSelection, editingCell, selectedCell, getCellData, updateCell]);
 
   const handleCellClick = useCallback((row: number, col: number, shiftKey = false) => {
-    if (readonly) return;
+    if (readonly || isDragging) return;
     
     const cellKey = `${row}-${col}`;
     setSelectedCell(cellKey);
@@ -278,13 +307,8 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     } else {
       setSelectionStart({ row, col });
       setSelectionEnd({ row, col });
-      
-      // Start editing immediately when clicking on a cell
-      const cellData = getCellData(row, col);
-      setEditingCell(cellKey);
-      setEditValue(cellData.formula || cellData.value || '');
     }
-  }, [readonly, getCellData]);
+  }, [readonly, isDragging]);
 
   const handleMouseDown = useCallback((row: number, col: number, e: React.MouseEvent) => {
     if (readonly) return;
@@ -297,11 +321,36 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     setDragStart({ row, col });
     setIsDragging(true);
     
-    // Check if this is a formula cell for dragging
+    // Start editing immediately on mouse down for better UX
     const cellData = getCellData(row, col);
+    setEditingCell(cellKey);
+    setEditValue(cellData.formula || cellData.value || '');
+    
+    // Focus the input after a brief delay to ensure it's rendered
+    setTimeout(() => {
+      const input = document.querySelector(`[data-cell-input="${cellKey}"]`) as HTMLInputElement;
+      if (input) {
+        input.focus();
+        input.select(); // Select all text for easy replacement
+      }
+    }, 0);
+    
+    // Check if this is a formula cell for dragging
     if (cellData.formula) {
       setIsDraggingFormula(true);
     }
+    
+    // Add global mouse up listener to handle drag end
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        setDragStart(null);
+        setIsDraggingFormula(false);
+      }
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+    
+    document.addEventListener('mouseup', handleGlobalMouseUp);
   }, [readonly, getCellData]);
 
   // Calculate column widths based on content
@@ -336,28 +385,35 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     let currentCol = 0;
     let currentRow = 0;
     
-    // Find column
+    // Find column - start from row number column width
     let colX = 48; // Width of row number column
     for (let col = 0; col < cols; col++) {
-      if (x >= colX && x < colX + colWidths[col]) {
+      const colWidth = colWidths[col] || 80; // fallback width
+      if (x >= colX && x < colX + colWidth) {
         currentCol = col;
         break;
       }
-      colX += colWidths[col];
+      colX += colWidth;
     }
     
-    // Find row
+    // Find row - start from header row height
     let rowY = 32; // Height of header row
     for (let row = 0; row < rows; row++) {
-      if (y >= rowY && y < rowY + 32) { // 32px row height
+      const rowHeight = 32; // 32px row height
+      if (y >= rowY && y < rowY + rowHeight) {
         currentRow = row;
         break;
       }
-      rowY += 32;
+      rowY += rowHeight;
     }
     
-    // Update selection
+    // Clamp to valid range
+    currentRow = Math.max(0, Math.min(rows - 1, currentRow));
+    currentCol = Math.max(0, Math.min(cols - 1, currentCol));
+    
+    // Update selection end point - this will create rectangular selection
     setSelectionEnd({ row: currentRow, col: currentCol });
+    // Keep the selected cell as the current cell under mouse
     setSelectedCell(`${currentRow}-${currentCol}`);
   }, [isDragging, dragStart, cols, rows, colWidths]);
 
@@ -365,7 +421,6 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     if (!isDragging || !dragStart) return;
     
     e.preventDefault();
-    setIsDragging(false);
     
     // If we were dragging a formula, copy it to all selected cells
     if (isDraggingFormula && dragStart) {
@@ -402,17 +457,11 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
       }
     }
     
+    setIsDragging(false);
     setDragStart(null);
     setIsDraggingFormula(false);
   }, [isDragging, dragStart, isDraggingFormula, selectionStart, selectionEnd, getCellData, adjustFormula, updateCell]);
 
-  const handleMouseLeave = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false);
-      setDragStart(null);
-      setIsDraggingFormula(false);
-    }
-  }, [isDragging]);
 
   const handleCellDoubleClick = useCallback((row: number, col: number) => {
     if (readonly) return;
@@ -422,6 +471,15 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     
     setEditingCell(cellKey);
     setEditValue(cellData.formula || cellData.value || '');
+    
+    // Focus the input after a brief delay to ensure it's rendered
+    setTimeout(() => {
+      const input = document.querySelector(`[data-cell-input="${cellKey}"]`) as HTMLInputElement;
+      if (input) {
+        input.focus();
+        input.select(); // Select all text for easy replacement
+      }
+    }, 0);
   }, [readonly, getCellData]);
 
   const handleCellEdit = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -430,6 +488,7 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
 
   const handleCellSubmit = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       if (editingCell) {
         const [row, col] = editingCell.split('-').map(Number);
         const isFormula = editValue.startsWith('=');
@@ -447,6 +506,7 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
         moveSelection('down');
       }
     } else if (e.key === 'Escape') {
+      e.preventDefault();
       setEditingCell(null);
       setEditValue('');
     } else if (e.key === 'Tab') {
@@ -572,7 +632,7 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     if (isActive) {
       borderClass = 'border-2 border-blue-500';
     } else if (isSelected) {
-      borderClass = 'border border-blue-300';
+      borderClass = 'border-2 border-blue-400';
     }
 
     return (
@@ -581,7 +641,7 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
         ref={isActive ? selectedCellRef : null}
         className={`
           ${borderClass} h-8 flex items-center px-2 text-sm cursor-pointer
-          ${isActive ? 'bg-blue-50' : isSelected ? 'bg-blue-25' : 'hover:bg-gray-50'}
+          ${isActive ? 'bg-blue-100' : isSelected ? 'bg-blue-200' : 'hover:bg-gray-50'}
           ${isFormula ? 'font-medium' : ''}
           ${readonly ? 'cursor-not-allowed' : ''}
           ${isDragging ? 'select-none' : ''}
@@ -589,9 +649,6 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
         `}
         style={cellStyle}
         onMouseDown={(e) => handleMouseDown(row, col, e)}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
         onClick={(e) => handleCellClick(row, col, e.shiftKey)}
         onDoubleClick={() => handleCellDoubleClick(row, col)}
       >
@@ -602,6 +659,7 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
             onChange={handleCellEdit}
             onKeyDown={handleCellSubmit}
             onBlur={handleCellBlur}
+            data-cell-input={cellKey}
             className="w-full h-full outline-none bg-transparent"
             style={{
               color: cellFormat.textColor || (isFormula ? '#059669' : '#111827'),
@@ -623,7 +681,7 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
         )}
       </div>
     );
-  }, [selectedCell, editingCell, editValue, getCellData, getCellValue, getCellFormat, handleCellClick, handleCellDoubleClick, handleCellEdit, handleCellSubmit, handleCellBlur, readonly, colWidths, isCellSelected, isCellActive, dragStart, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave]);
+  }, [selectedCell, editingCell, editValue, getCellData, getCellValue, getCellFormat, handleCellClick, handleCellDoubleClick, handleCellEdit, handleCellSubmit, handleCellBlur, readonly, colWidths, isCellSelected, isCellActive, dragStart, isDragging, handleMouseDown, handleMouseMove, handleMouseUp]);
 
   const formulaBarValue = useMemo(() => {
     if (!selectedCell) return '';
@@ -663,7 +721,6 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
       onKeyDown={handleKeyDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
     >
       {/* Formatting Toolbar */}
       <div className="p-3 border-b bg-gray-50 flex items-center space-x-4">
