@@ -1,24 +1,23 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { SpreadsheetData, CellData } from '../types/project';
-import { evaluateFormula } from '../utils/formulas';
+import { 
+  CellFormat,
+  getCellValue as getCellValueHelper,
+  getCellData as getCellDataHelper,
+  getCellFormat as getCellFormatHelper,
+  getColumnName as getColumnNameHelper,
+  adjustFormula as adjustFormulaHelper,
+  isCellSelected as isCellSelectedHelper,
+  isCellActive as isCellActiveHelper,
+  getCommonFormat as getCommonFormatHelper,
+  calculateColumnWidths
+} from '../utils/spreadsheetHelpers';
 
 interface SpreadsheetProps {
   data: SpreadsheetData;
   onDataUpdate: (data: SpreadsheetData) => void;
   readonly?: boolean;
 }
-
-interface CellFormat {
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  backgroundColor?: string;
-  textColor?: string;
-  fontSize?: number;
-  alignment?: 'left' | 'center' | 'right';
-}
-
-// Remove this interface as it's not needed
 
 const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly = false }) => {
   const [selectedCell, setSelectedCell] = useState<string | null>('0-0');
@@ -57,78 +56,26 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
   }, [data, onDataUpdate]);
 
   const getCellValue = useCallback((row: number, col: number): string => {
-    const cell = data[`${row}-${col}`];
-    if (!cell) return '';
-    
-    if (cell.formula) {
-      try {
-        const result = evaluateFormula(cell.formula, data);
-        return result.toString();
-      } catch (error) {
-        return '#ERROR';
-      }
-    }
-    
-    return cell.value || '';
+    return getCellValueHelper(data, row, col);
   }, [data]);
 
   const getCellData = useCallback((row: number, col: number): CellData => {
-    return data[`${row}-${col}`] || { value: '', formula: null };
+    return getCellDataHelper(data, row, col);
   }, [data]);
 
   const getCellFormat = useCallback((row: number, col: number): CellFormat => {
-    return formats[`${row}-${col}`] || {};
+    return getCellFormatHelper(formats, row, col);
   }, [formats]);
 
   const getColumnName = useCallback((col: number): string => {
-    // Use custom header if available, otherwise fall back to A, B, C format
-    if ((data as any).headers && (data as any).headers[col]) {
-      return (data as any).headers[col] as string;
-    }
-    return String.fromCharCode(65 + col);
+    return getColumnNameHelper(data, col);
   }, [data]);
 
-  // Convert row/col to Excel-style cell reference (A1, B2, etc.)
-  const getCellReference = useCallback((row: number, col: number): string => {
-    const colName = getColumnName(col);
-    return `${colName}${row + 1}`;
-  }, [getColumnName]);
-
-  // Convert Excel-style cell reference to row/col
-  const parseCellReference = useCallback((cellRef: string): {row: number, col: number} => {
-    const match = cellRef.match(/([A-Z]+)(\d+)/);
-    if (!match) throw new Error(`Invalid cell reference: ${cellRef}`);
-    
-    const [, col, row] = match;
-    const colIndex = col.split('').reduce((acc, char) => acc * 26 + (char.charCodeAt(0) - 64), 0) - 1;
-    const rowIndex = parseInt(row) - 1;
-    
-    return { row: rowIndex, col: colIndex };
-  }, []);
 
   // Adjust formula cell references based on drag offset
   const adjustFormula = useCallback((formula: string, sourceRow: number, sourceCol: number, targetRow: number, targetCol: number): string => {
-    if (!formula.startsWith('=')) return formula;
-    
-    const rowOffset = targetRow - sourceRow;
-    const colOffset = targetCol - sourceCol;
-    
-    return formula.replace(/[A-Z]+\d+/g, (cellRef) => {
-      try {
-        const { row, col } = parseCellReference(cellRef);
-        const newRow = row + rowOffset;
-        const newCol = col + colOffset;
-        
-        // Only adjust if the new position is valid
-        if (newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols) {
-          return getCellReference(newRow, newCol);
-        }
-        return cellRef; // Keep original if out of bounds
-      } catch (error) {
-        return cellRef; // Keep original if parsing fails
-      }
-    });
-  }, [parseCellReference, getCellReference, rows, cols]);
+    return adjustFormulaHelper(formula, sourceRow, sourceCol, targetRow, targetCol, data, rows, cols);
+  }, [data, rows, cols]);
 
   const updateCellFormat = useCallback((row: number, col: number, format: Partial<CellFormat>) => {
     const cellKey = `${row}-${col}`;
@@ -354,19 +301,8 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
   }, [readonly, getCellData]);
 
   // Calculate column widths based on content
-  const MIN_COL_WIDTH = 80;
-  const MAX_COL_WIDTH = 200;
   const colWidths = useMemo(() => {
-    const widths: number[] = Array(cols).fill(MIN_COL_WIDTH);
-    for (let col = 0; col < cols; col++) {
-      for (let row = 0; row < Math.min(rows, 100); row++) { // Limit calculation for performance
-        const value = getCellValue(row, col);
-        // Estimate width: 8px per char + padding
-        const estWidth = Math.min(MAX_COL_WIDTH, Math.max(MIN_COL_WIDTH, value.length * 8 + 24));
-        if (estWidth > widths[col]) widths[col] = estWidth;
-      }
-    }
-    return widths;
+    return calculateColumnWidths(data, cols, rows, getCellValue);
   }, [data, cols, rows, getCellValue]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -551,57 +487,16 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
   }, [editingCell, editValue, updateCell]);
 
   const isCellSelected = useCallback((row: number, col: number): boolean => {
-    if (!selectedCell) return false;
-    
-    const [startRow, startCol] = [selectionStart.row, selectionStart.col];
-    const [endRow, endCol] = [selectionEnd.row, selectionEnd.col];
-    
-    const minRow = Math.min(startRow, endRow);
-    const maxRow = Math.max(startRow, endRow);
-    const minCol = Math.min(startCol, endCol);
-    const maxCol = Math.max(startCol, endCol);
-    
-    return row >= minRow && row <= maxRow && col >= minCol && col <= maxCol;
+    return isCellSelectedHelper(row, col, selectedCell, selectionStart, selectionEnd);
   }, [selectedCell, selectionStart, selectionEnd]);
 
   const isCellActive = useCallback((row: number, col: number): boolean => {
-    return selectedCell === `${row}-${col}`;
+    return isCellActiveHelper(row, col, selectedCell);
   }, [selectedCell]);
 
   const getCommonFormat = useCallback((): CellFormat => {
-    if (!selectedCell) return {};
-    
-    const [startRow, startCol] = [selectionStart.row, selectionStart.col];
-    const [endRow, endCol] = [selectionEnd.row, selectionEnd.col];
-    
-    const minRow = Math.min(startRow, endRow);
-    const maxRow = Math.max(startRow, endRow);
-    const minCol = Math.min(startCol, endCol);
-    const maxCol = Math.max(startCol, endCol);
-    
-    const formats: CellFormat[] = [];
-    for (let row = minRow; row <= maxRow; row++) {
-      for (let col = minCol; col <= maxCol; col++) {
-        formats.push(getCellFormat(row, col));
-      }
-    }
-    
-    if (formats.length === 0) return {};
-    
-    // Return common format properties
-    const commonFormat: CellFormat = {};
-    const firstFormat = formats[0];
-    
-    if (formats.every(f => f.bold === firstFormat.bold)) commonFormat.bold = firstFormat.bold;
-    if (formats.every(f => f.italic === firstFormat.italic)) commonFormat.italic = firstFormat.italic;
-    if (formats.every(f => f.underline === firstFormat.underline)) commonFormat.underline = firstFormat.underline;
-    if (formats.every(f => f.backgroundColor === firstFormat.backgroundColor)) commonFormat.backgroundColor = firstFormat.backgroundColor;
-    if (formats.every(f => f.textColor === firstFormat.textColor)) commonFormat.textColor = firstFormat.textColor;
-    if (formats.every(f => f.fontSize === firstFormat.fontSize)) commonFormat.fontSize = firstFormat.fontSize;
-    if (formats.every(f => f.alignment === firstFormat.alignment)) commonFormat.alignment = firstFormat.alignment;
-    
-    return commonFormat;
-  }, [selectedCell, selectionStart, selectionEnd, getCellFormat]);
+    return getCommonFormatHelper(selectedCell, selectionStart, selectionEnd, formats, getCellFormat);
+  }, [selectedCell, selectionStart, selectionEnd, formats, getCellFormat]);
 
   const renderCell = useCallback((row: number, col: number) => {
     const cellKey = `${row}-${col}`;
