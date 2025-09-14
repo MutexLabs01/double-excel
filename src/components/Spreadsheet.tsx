@@ -1,7 +1,6 @@
-import React, { useState, useCallback, useMemo, useRef, useLayoutEffect, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { SpreadsheetData, CellData } from '../types/project';
 import { evaluateFormula } from '../utils/formulas';
-import { getColumnName } from '../utils/helpers';
 
 interface SpreadsheetProps {
   data: SpreadsheetData;
@@ -29,6 +28,9 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
   const [selectionEnd, setSelectionEnd] = useState<{row: number, col: number}>({ row: 0, col: 0 });
   const [formats, setFormats] = useState<{ [key: string]: CellFormat }>({});
   const [showColorPicker, setShowColorPicker] = useState<'bg' | 'text' | null>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{row: number, col: number} | null>(null);
+  const [isDraggingFormula, setIsDraggingFormula] = useState<boolean>(false);
   
   const spreadsheetRef = useRef<HTMLDivElement>(null);
   const selectedCellRef = useRef<HTMLDivElement>(null);
@@ -45,9 +47,9 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
   }, [data, onDataUpdate]);
 
   const updateHeader = useCallback((col: number, header: string) => {
-    const newHeaders = [...(data.headers || [])];
+    const newHeaders = [...((data as any).headers || [])];
     newHeaders[col] = header;
-    const newData = {
+    const newData: any = {
       ...data,
       headers: newHeaders
     };
@@ -80,11 +82,53 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
 
   const getColumnName = useCallback((col: number): string => {
     // Use custom header if available, otherwise fall back to A, B, C format
-    if (data.headers && data.headers[col]) {
-      return data.headers[col];
+    if ((data as any).headers && (data as any).headers[col]) {
+      return (data as any).headers[col] as string;
     }
     return String.fromCharCode(65 + col);
-  }, [data.headers]);
+  }, [data]);
+
+  // Convert row/col to Excel-style cell reference (A1, B2, etc.)
+  const getCellReference = useCallback((row: number, col: number): string => {
+    const colName = getColumnName(col);
+    return `${colName}${row + 1}`;
+  }, [getColumnName]);
+
+  // Convert Excel-style cell reference to row/col
+  const parseCellReference = useCallback((cellRef: string): {row: number, col: number} => {
+    const match = cellRef.match(/([A-Z]+)(\d+)/);
+    if (!match) throw new Error(`Invalid cell reference: ${cellRef}`);
+    
+    const [, col, row] = match;
+    const colIndex = col.split('').reduce((acc, char) => acc * 26 + (char.charCodeAt(0) - 64), 0) - 1;
+    const rowIndex = parseInt(row) - 1;
+    
+    return { row: rowIndex, col: colIndex };
+  }, []);
+
+  // Adjust formula cell references based on drag offset
+  const adjustFormula = useCallback((formula: string, sourceRow: number, sourceCol: number, targetRow: number, targetCol: number): string => {
+    if (!formula.startsWith('=')) return formula;
+    
+    const rowOffset = targetRow - sourceRow;
+    const colOffset = targetCol - sourceCol;
+    
+    return formula.replace(/[A-Z]+\d+/g, (cellRef) => {
+      try {
+        const { row, col } = parseCellReference(cellRef);
+        const newRow = row + rowOffset;
+        const newCol = col + colOffset;
+        
+        // Only adjust if the new position is valid
+        if (newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols) {
+          return getCellReference(newRow, newCol);
+        }
+        return cellRef; // Keep original if out of bounds
+      } catch (error) {
+        return cellRef; // Keep original if parsing fails
+      }
+    });
+  }, [parseCellReference, getCellReference, rows, cols]);
 
   const updateCellFormat = useCallback((row: number, col: number, format: Partial<CellFormat>) => {
     const cellKey = `${row}-${col}`;
@@ -116,9 +160,6 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     }
   }, [selectionStart, selectionEnd, updateCellFormat]);
 
-  const isValidCell = useCallback((row: number, col: number): boolean => {
-    return row >= 0 && row < rows && col >= 0 && col < cols;
-  }, [rows, cols]);
 
   const moveSelection = useCallback((direction: 'up' | 'down' | 'left' | 'right', shiftKey = false) => {
     if (!selectedCell) return;
@@ -245,6 +286,134 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     }
   }, [readonly, getCellData]);
 
+  const handleMouseDown = useCallback((row: number, col: number, e: React.MouseEvent) => {
+    if (readonly) return;
+    
+    e.preventDefault();
+    const cellKey = `${row}-${col}`;
+    setSelectedCell(cellKey);
+    setSelectionStart({ row, col });
+    setSelectionEnd({ row, col });
+    setDragStart({ row, col });
+    setIsDragging(true);
+    
+    // Check if this is a formula cell for dragging
+    const cellData = getCellData(row, col);
+    if (cellData.formula) {
+      setIsDraggingFormula(true);
+    }
+  }, [readonly, getCellData]);
+
+  // Calculate column widths based on content
+  const MIN_COL_WIDTH = 80;
+  const MAX_COL_WIDTH = 200;
+  const colWidths = useMemo(() => {
+    const widths: number[] = Array(cols).fill(MIN_COL_WIDTH);
+    for (let col = 0; col < cols; col++) {
+      for (let row = 0; row < Math.min(rows, 100); row++) { // Limit calculation for performance
+        const value = getCellValue(row, col);
+        // Estimate width: 8px per char + padding
+        const estWidth = Math.min(MAX_COL_WIDTH, Math.max(MIN_COL_WIDTH, value.length * 8 + 24));
+        if (estWidth > widths[col]) widths[col] = estWidth;
+      }
+    }
+    return widths;
+  }, [data, cols, rows, getCellValue]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging || !dragStart) return;
+    
+    e.preventDefault();
+    
+    // Get the cell under the mouse
+    const rect = spreadsheetRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Calculate which cell the mouse is over
+    let currentCol = 0;
+    let currentRow = 0;
+    
+    // Find column
+    let colX = 48; // Width of row number column
+    for (let col = 0; col < cols; col++) {
+      if (x >= colX && x < colX + colWidths[col]) {
+        currentCol = col;
+        break;
+      }
+      colX += colWidths[col];
+    }
+    
+    // Find row
+    let rowY = 32; // Height of header row
+    for (let row = 0; row < rows; row++) {
+      if (y >= rowY && y < rowY + 32) { // 32px row height
+        currentRow = row;
+        break;
+      }
+      rowY += 32;
+    }
+    
+    // Update selection
+    setSelectionEnd({ row: currentRow, col: currentCol });
+    setSelectedCell(`${currentRow}-${currentCol}`);
+  }, [isDragging, dragStart, cols, rows, colWidths]);
+
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if (!isDragging || !dragStart) return;
+    
+    e.preventDefault();
+    setIsDragging(false);
+    
+    // If we were dragging a formula, copy it to all selected cells
+    if (isDraggingFormula && dragStart) {
+      const sourceCellData = getCellData(dragStart.row, dragStart.col);
+      if (sourceCellData.formula) {
+        const [startRow, startCol] = [selectionStart.row, selectionStart.col];
+        const [endRow, endCol] = [selectionEnd.row, selectionEnd.col];
+        
+        const minRow = Math.min(startRow, endRow);
+        const maxRow = Math.max(startRow, endRow);
+        const minCol = Math.min(startCol, endCol);
+        const maxCol = Math.max(startCol, endCol);
+        
+        // Copy formula to all cells in selection
+        for (let row = minRow; row <= maxRow; row++) {
+          for (let col = minCol; col <= maxCol; col++) {
+            if (row !== dragStart.row || col !== dragStart.col) {
+              const adjustedFormula = adjustFormula(
+                sourceCellData.formula!,
+                dragStart.row,
+                dragStart.col,
+                row,
+                col
+              );
+              
+              const cellData: CellData = {
+                value: '',
+                formula: adjustedFormula
+              };
+              updateCell(row, col, cellData);
+            }
+          }
+        }
+      }
+    }
+    
+    setDragStart(null);
+    setIsDraggingFormula(false);
+  }, [isDragging, dragStart, isDraggingFormula, selectionStart, selectionEnd, getCellData, adjustFormula, updateCell]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+      setDragStart(null);
+      setIsDraggingFormula(false);
+    }
+  }, [isDragging]);
+
   const handleCellDoubleClick = useCallback((row: number, col: number) => {
     if (readonly) return;
     
@@ -321,22 +490,6 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     }
   }, [editingCell, editValue, updateCell]);
 
-  // Calculate column widths based on content
-  const MIN_COL_WIDTH = 80;
-  const MAX_COL_WIDTH = 200;
-  const colWidths = useMemo(() => {
-    const widths: number[] = Array(cols).fill(MIN_COL_WIDTH);
-    for (let col = 0; col < cols; col++) {
-      for (let row = 0; row < Math.min(rows, 100); row++) { // Limit calculation for performance
-        const value = getCellValue(row, col);
-        // Estimate width: 8px per char + padding
-        const estWidth = Math.min(MAX_COL_WIDTH, Math.max(MIN_COL_WIDTH, value.length * 8 + 24));
-        if (estWidth > widths[col]) widths[col] = estWidth;
-      }
-    }
-    return widths;
-  }, [data, cols, rows, getCellValue]);
-
   const isCellSelected = useCallback((row: number, col: number): boolean => {
     if (!selectedCell) return false;
     
@@ -411,20 +564,34 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
       fontStyle: cellFormat.italic ? 'italic' : 'normal',
       textDecoration: cellFormat.underline ? 'underline' : 'none',
       textAlign: cellFormat.alignment || 'left',
+      position: 'relative',
     };
+
+    // Determine border style for Excel-like appearance
+    let borderClass = 'border border-gray-200';
+    if (isActive) {
+      borderClass = 'border-2 border-blue-500';
+    } else if (isSelected) {
+      borderClass = 'border border-blue-300';
+    }
 
     return (
       <div
         key={cellKey}
         ref={isActive ? selectedCellRef : null}
         className={`
-          border border-gray-200 h-8 flex items-center px-2 text-sm cursor-pointer
-          ${isActive ? 'bg-blue-100 border-blue-400' : isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'}
+          ${borderClass} h-8 flex items-center px-2 text-sm cursor-pointer
+          ${isActive ? 'bg-blue-50' : isSelected ? 'bg-blue-25' : 'hover:bg-gray-50'}
           ${isFormula ? 'font-medium' : ''}
           ${readonly ? 'cursor-not-allowed' : ''}
+          ${isDragging ? 'select-none' : ''}
           transition-colors duration-150
         `}
         style={cellStyle}
+        onMouseDown={(e) => handleMouseDown(row, col, e)}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
         onClick={(e) => handleCellClick(row, col, e.shiftKey)}
         onDoubleClick={() => handleCellDoubleClick(row, col)}
       >
@@ -449,9 +616,14 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
         ) : (
           <span className="truncate">{cellValue}</span>
         )}
+        
+        {/* Drag handle for formula cells */}
+        {isActive && isFormula && !isEditing && (
+          <div className="absolute bottom-0 right-0 w-2 h-2 bg-blue-500 cursor-se-resize opacity-70 hover:opacity-100" />
+        )}
       </div>
     );
-  }, [selectedCell, editingCell, editValue, getCellData, getCellValue, getCellFormat, handleCellClick, handleCellDoubleClick, handleCellEdit, handleCellSubmit, handleCellBlur, readonly, colWidths, isCellSelected, isCellActive]);
+  }, [selectedCell, editingCell, editValue, getCellData, getCellValue, getCellFormat, handleCellClick, handleCellDoubleClick, handleCellEdit, handleCellSubmit, handleCellBlur, readonly, colWidths, isCellSelected, isCellActive, dragStart, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave]);
 
   const formulaBarValue = useMemo(() => {
     if (!selectedCell) return '';
@@ -489,6 +661,9 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
       className="flex flex-col h-full"
       tabIndex={0}
       onKeyDown={handleKeyDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
     >
       {/* Formatting Toolbar */}
       <div className="p-3 border-b bg-gray-50 flex items-center space-x-4">
@@ -679,7 +854,7 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
               >
                 <input
                   type="text"
-                  value={data.headers?.[col] || ''}
+                  value={((data as any).headers?.[col] as string) || ''}
                   onChange={(e) => updateHeader(col, e.target.value)}
                   placeholder={String.fromCharCode(65 + col)}
                   className="w-full h-full text-center bg-transparent border-none outline-none text-xs font-medium text-gray-600 placeholder-gray-400"
@@ -708,7 +883,9 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
       <div className="p-4 border-t bg-gray-50">
         <div className="text-xs text-gray-600 space-y-1">
           <p><strong>Navigation:</strong> Arrow keys to move, Shift+Arrow for selection, Tab to move right</p>
+          <p><strong>Selection:</strong> Click and drag to select multiple cells, Shift+Click for range selection</p>
           <p><strong>Editing:</strong> Click cell to edit immediately, Enter to confirm, Escape to cancel</p>
+          <p><strong>Formula Dragging:</strong> Drag from a cell with formula to copy it to other cells with relative references</p>
           <p><strong>Formatting:</strong> Use toolbar for bold, italic, colors, alignment, and font size</p>
           <p><strong>Formulas:</strong> Start with = (e.g., =SUM(A1:A5), =A1+B1, =AVERAGE(B1:B10))</p>
           <p><strong>Supported Functions:</strong> SUM, AVERAGE, COUNT, MIN, MAX, IF</p>
