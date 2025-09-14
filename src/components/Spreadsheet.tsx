@@ -44,6 +44,16 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
     onDataUpdate(newData);
   }, [data, onDataUpdate]);
 
+  const updateHeader = useCallback((col: number, header: string) => {
+    const newHeaders = [...(data.headers || [])];
+    newHeaders[col] = header;
+    const newData = {
+      ...data,
+      headers: newHeaders
+    };
+    onDataUpdate(newData);
+  }, [data, onDataUpdate]);
+
   const getCellValue = useCallback((row: number, col: number): string => {
     const cell = data[`${row}-${col}`];
     if (!cell) return '';
@@ -67,6 +77,14 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
   const getCellFormat = useCallback((row: number, col: number): CellFormat => {
     return formats[`${row}-${col}`] || {};
   }, [formats]);
+
+  const getColumnName = useCallback((col: number): string => {
+    // Use custom header if available, otherwise fall back to A, B, C format
+    if (data.headers && data.headers[col]) {
+      return data.headers[col];
+    }
+    return String.fromCharCode(65 + col);
+  }, [data.headers]);
 
   const updateCellFormat = useCallback((row: number, col: number, format: Partial<CellFormat>) => {
     const cellKey = `${row}-${col}`;
@@ -659,7 +677,14 @@ const Spreadsheet: React.FC<SpreadsheetProps> = ({ data, onDataUpdate, readonly 
                 className="min-w-20 h-8 border border-gray-300 bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600"
                 style={{ minWidth: colWidths[col], maxWidth: colWidths[col], width: colWidths[col] }}
               >
-                {getColumnName(col)}
+                <input
+                  type="text"
+                  value={data.headers?.[col] || ''}
+                  onChange={(e) => updateHeader(col, e.target.value)}
+                  placeholder={String.fromCharCode(65 + col)}
+                  className="w-full h-full text-center bg-transparent border-none outline-none text-xs font-medium text-gray-600 placeholder-gray-400"
+                  style={{ minWidth: colWidths[col] - 8 }}
+                />
               </div>
             ))}
           </div>

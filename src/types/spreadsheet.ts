@@ -5,6 +5,7 @@ export interface CellData {
 
 export interface SpreadsheetData {
   [key: string]: CellData;
+  headers?: string[]; // Column headers for the spreadsheet
 }
 
 export interface Version {

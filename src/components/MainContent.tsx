@@ -51,39 +51,7 @@ const MainContent: React.FC<MainContentProps> = ({
         <div className="text-center">
           <FolderOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No file selected</h3>
-          <p className="text-gray-500 mb-4">Create a new spreadsheet or chart to get started</p>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => {
-                const name = prompt('Enter file name:');
-                if (name) createNewFile(name, 'spreadsheet');
-              }}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-green-700"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Spreadsheet
-            </button>
-            <button
-              onClick={() => {
-                const name = prompt('Enter chart name:');
-                if (name) createNewFile(name, 'chart');
-              }}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Chart
-            </button>
-            <button
-              onClick={() => {
-                const name = prompt('Enter model name:');
-                if (name) createNewFile(name, 'financial_model');
-              }}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Financial Model
-            </button>
-          </div>
+          <p className="text-gray-500">Use the "Create New" menu in the navigation bar to get started</p>
         </div>
       </div>
     )}

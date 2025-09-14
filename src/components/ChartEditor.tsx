@@ -38,12 +38,21 @@ const ChartEditor: React.FC<ChartEditorProps> = ({
     if (!file || file.type !== 'spreadsheet') return [];
 
     const data = file.data as SpreadsheetData;
-    const columns = new Set<string>();
     
+    // Use headers array if available, otherwise extract from row 0
+    if (data.headers && data.headers.length > 0) {
+      return data.headers.filter(header => header && header.trim() !== '');
+    }
+    
+    // Fallback to extracting from row 0
+    const columns = new Set<string>();
     Object.keys(data).forEach(cellKey => {
       const [row, col] = cellKey.split('-').map(Number);
       if (row === 0) { // Header row
-        columns.add(getColumnName(col));
+        const cell = data[cellKey];
+        if (cell && cell.value && cell.value.trim() !== '') {
+          columns.add(cell.value);
+        }
       }
     });
 
@@ -55,7 +64,18 @@ const ChartEditor: React.FC<ChartEditorProps> = ({
     if (!file || file.type !== 'spreadsheet') return [];
 
     const data = file.data as SpreadsheetData;
-    const colIndex = column.charCodeAt(0) - 65; // Convert A, B, C to 0, 1, 2
+    let colIndex = -1;
+    
+    // Find column index by name
+    if (data.headers && data.headers.length > 0) {
+      colIndex = data.headers.findIndex(header => header === column);
+    } else {
+      // Fallback to A, B, C format
+      colIndex = column.charCodeAt(0) - 65;
+    }
+    
+    if (colIndex === -1) return [];
+    
     const values: any[] = [];
 
     // Start from row 1 (skip header)
